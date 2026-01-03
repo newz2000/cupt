@@ -71,6 +71,16 @@ class ClickUpClient:
         response = self._make_request('GET', f'/team/{team_id}/task', params=params)
         return response.get('tasks', [])
     
+    def get_tasks_by_ids(self, team_id: str, task_ids: List[str]) -> List[Dict[str, Any]]:
+        """Fetch multiple tasks by their IDs (bulk)"""
+        if not task_ids:
+            return []
+            
+        # ClickUp allows up to 100 IDs per request
+        params = {'ids[]': task_ids[:100], 'include_subtasks': 'true'}
+        response = self._make_request('GET', f'/team/{team_id}/task', params=params)
+        return response.get('tasks', [])
+    
     def get_task(self, task_id: str) -> Dict[str, Any]:
         """Get single task by ID"""
         return self._make_request('GET', f'/task/{task_id}')

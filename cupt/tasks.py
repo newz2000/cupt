@@ -165,17 +165,39 @@ def list_tasks(overdue=False, today=False, week=False, limit=None, verbose=False
         # Apply limit
         if limit:
             tasks = tasks[:limit]
+            
+        # Resolve parent names for subtasks
+        parent_map = {}
+        # Pre-populate map with tasks we already have in the list
+        for t in tasks:
+            parent_map[t['id']] = t['name']
+            
         # Display tasks
         click.echo(f"\n{'ID':<12} {'Status':<12} {'Due':<18} {'Name'}")
-        click.echo("-" * 80)
+        click.echo("-" * 120)
         
         for task in tasks:
             task_id = task.get('id', 'No ID')
             status_obj = task.get('status', {})
             status = status_obj.get('status', 'unknown')
             due_date = format_date(task.get('due_date'))
-            name = truncate_text(task.get('name', 'No name'), 40)
             
+            name = task.get('name', 'No name')
+            p_id = task.get('parent')
+            
+            if p_id:
+                if p_id not in parent_map:
+                    # Resolve parent name (cached for this list call)
+                    try:
+                        parent_task = client.get_task(p_id)
+                        parent_map[p_id] = parent_task.get('name', p_id)
+                    except Exception:
+                        parent_map[p_id] = p_id
+                
+                p_name = parent_map.get(p_id, p_id)
+                name = f"↳ {name} (sub of {p_name})"
+            
+            name = truncate_text(name, 75)
             click.echo(f"{task_id:<12} {status:<12} {due_date:<18} {name}")
         
         return tasks
@@ -218,8 +240,15 @@ def show_task(task_id: str, include_notes: bool = False):
         click.echo(f"Space:    {task.get('space', {}).get('id')}")
         click.echo(f"Folder:   {task.get('folder', {}).get('name', 'N/A')} ({task.get('folder', {}).get('id', 'N/A')})")
         click.echo(f"List:     {task.get('list', {}).get('name', 'N/A')} ({task.get('list', {}).get('id', 'N/A')})")
+        
         if task.get('parent'):
-            click.echo(f"Parent:   {task.get('parent')}")
+            p_id = task.get('parent')
+            try:
+                parent_task = client.get_task(p_id)
+                p_name = parent_task.get('name', 'Unknown')
+                click.echo(f"Parent:   {p_name} ({p_id})")
+            except Exception:
+                click.echo(f"Parent:   {p_id}")
         
         desc = task.get('description', '')
         if desc:
