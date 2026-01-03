@@ -4,28 +4,62 @@ from cupt.utils import print_error, print_success, print_warning, print_info, fo
 
 import click
 from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Set
+
+def get_active_statuses(client: ClickUpClient, team_id: str) -> List[str]:
+    """Fetch all statuses that are not 'done' or 'closed' in the workspace"""
+    try:
+        active_statuses = set()
+        spaces = client.get_spaces(team_id)
+        for space in spaces:
+            # Check space statuses
+            for status in space.get('statuses', []):
+                if status.get('type') not in ['done', 'closed']:
+                    active_statuses.add(status.get('status'))
+            
+            # Check list statuses (important for overrides)
+            lists = client.get_lists(space.get('id'))
+            for lst in lists:
+                # Some lists might have their own statuses
+                for status in lst.get('statuses', []):
+                    if status.get('type') not in ['done', 'closed']:
+                        active_statuses.add(status.get('status'))
+        
+        return list(active_statuses)
+    except Exception:
+        # Fallback to some common ones if fetching fails
+        return ['Open', 'to do', 'in progress', 'active', 'OPEN']
 
 def get_filters(overdue: bool, today: bool, week: bool) -> Dict[str, Any]:
     """Build filter parameters based on options"""
     filters = {}
     
+    # Enable subtasks by default to ensure we don't miss anything
+    # 'subtasks' shows them nested, 'include_subtasks' shows them in the flat list
+    # IMPORTANT: ClickUp API requires lowercase 'true' strings
+    filters['subtasks'] = 'true'
+    filters['include_subtasks'] = 'true'
+    
     if overdue:
         # For overdue, we want tasks whose due_date is in the past
-        # Note: ClickUp API uses milliseconds
         now_ms = int(datetime.now().timestamp() * 1000)
         filters['due_date_lt'] = now_ms
+        filters['order_by'] = 'due_date'
+        filters['reverse'] = True  # Show most recent overdue first
     elif today:
         today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         today_end = today_start + timedelta(days=1)
-        filters['due_date_gte'] = int(today_start.timestamp() * 1000)
+        filters['due_date_gt'] = int(today_start.timestamp() * 1000)
         filters['due_date_lt'] = int(today_end.timestamp() * 1000)
+        filters['order_by'] = 'due_date'
+        filters['reverse'] = False
     elif week:
         week_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        # Week starts from today, looking forward 7 days
         week_end = week_start + timedelta(days=7)
-        filters['due_date_gte'] = int(week_start.timestamp() * 1000)
+        filters['due_date_gt'] = int(week_start.timestamp() * 1000)
         filters['due_date_lt'] = int(week_end.timestamp() * 1000)
+        filters['order_by'] = 'due_date'
+        filters['reverse'] = False
     
     return filters
 
@@ -36,11 +70,18 @@ def get_filters(overdue: bool, today: bool, week: bool) -> Dict[str, Any]:
 @click.option('-n', '--limit', type=int, help='Limit results')
 @click.option('--verbose', is_flag=True, help='Show extra info')
 @click.option('--team-id', help='Override team ID')
-def list_tasks_cmd(overdue, today, week, limit, verbose, team_id=None):
+@click.option('--include-closed', is_flag=True, help='Include closed tasks')
+@click.option('--mine', is_flag=True, default=True, help='Show only tasks assigned to you (default)')
+@click.option('--all', 'show_all', is_flag=True, help='Show tasks for the whole team')
+@click.option('--hide-subtasks', is_flag=True, help='Hide subtasks from the list')
+def list_tasks_cmd(overdue, today, week, limit, verbose, team_id=None, include_closed=False, mine=True, show_all=False, hide_subtasks=False):
     """List tasks with optional filters"""
-    return list_tasks(overdue, today, week, limit, verbose, team_id)
+    # If --all is passed, it overrides the default --mine
+    if show_all:
+        mine = False
+    return list_tasks(overdue, today, week, limit, verbose, team_id, include_closed, mine, hide_subtasks)
 
-def list_tasks(overdue=False, today=False, week=False, limit=None, verbose=False, team_id=None):
+def list_tasks(overdue=False, today=False, week=False, limit=None, verbose=False, team_id=None, include_closed=False, mine=True, hide_subtasks=False):
     """Logic for listing tasks (can be called from CLI or code)"""
     config = ConfigManager()
     
@@ -49,23 +90,70 @@ def list_tasks(overdue=False, today=False, week=False, limit=None, verbose=False
         return []
     
     selected_team_id = team_id or config.get('user.team_id')
+    user_id = config.get('user.user_id')
+    
     if not selected_team_id:
         print_error("Team ID not set. Run 'cupt config --team-id <id>' first.")
         return []
-    
-    # Build filters
+        
+    # Build initial filters
     filters = get_filters(overdue, today, week)
+    
+    # filter by assignee to match personal reports
+    if mine and user_id:
+        filters['assignees[]'] = [user_id]
+        if verbose:
+            print_info(f"Filtering for tasks assigned to YOU (ID: {user_id})")
+    
+    # Ensure subtasks are included in the flat list
+    # Use string 'true' because ClickUp API is picky about casing
+    filters['subtasks'] = 'true'
+    filters['include_subtasks'] = 'true'
     
     try:
         client = ClickUpClient(config.get('auth.access_token'))
         
-        if verbose:
-            print_info(f"Fetching tasks with filters: {filters}")
+        all_found = []
+        page = 0
+        # If showing all team tasks, limit searching depth slightly to avoid infinite loops
+        # with thousands of closed tasks. If showing 'mine', we can go deeper safely.
+        # Increased to 15 to handle deep backlogs.
+        max_pages = 5 if not mine else 15
         
-        tasks = client.get_team_tasks(selected_team_id, filters)
+        while page < max_pages:
+            filters['page'] = page
+            tasks = client.get_team_tasks(selected_team_id, filters)
+            
+            if not tasks:
+                break
+                
+            # Local filter for active/overdue tasks
+            if not include_closed:
+                # Strictly filter out 'done' and 'closed' status types
+                filtered = [t for t in tasks if t.get('status', {}).get('type') not in ['done', 'closed']]
+            else:
+                filtered = tasks
+                
+            # Local filter for subtasks
+            if hide_subtasks:
+                filtered = [t for t in filtered if not t.get('parent')]
+                
+            all_found.extend(filtered)
+            
+            # If we already have a full page of filtering results, don't fetch forever
+            if len(all_found) >= 100:
+                break
+            
+            # If we didn't get a full page from API, it's the end of results
+            if len(tasks) < 100:
+                break
+                
+            page += 1
+            
+        tasks = all_found
         
         if not tasks:
-            print_warning("No tasks found")
+            print_warning("No active tasks found matching criteria.")
             return []
         
         # Sort by due date (tasks without due dates at end)
@@ -77,7 +165,6 @@ def list_tasks(overdue=False, today=False, week=False, limit=None, verbose=False
         # Apply limit
         if limit:
             tasks = tasks[:limit]
-        
         # Display tasks
         click.echo(f"\n{'ID':<12} {'Status':<12} {'Due':<18} {'Name'}")
         click.echo("-" * 80)
@@ -127,6 +214,13 @@ def show_task(task_id: str, include_notes: bool = False):
         click.echo(f"Priority: {task.get('priority', {}).get('priority', 'none').upper() if task.get('priority') else 'NONE'}")
         click.echo(f"Due Date: {format_date(task.get('due_date'))}")
         
+        # Add context info
+        click.echo(f"Space:    {task.get('space', {}).get('id')}")
+        click.echo(f"Folder:   {task.get('folder', {}).get('name', 'N/A')} ({task.get('folder', {}).get('id', 'N/A')})")
+        click.echo(f"List:     {task.get('list', {}).get('name', 'N/A')} ({task.get('list', {}).get('id', 'N/A')})")
+        if task.get('parent'):
+            click.echo(f"Parent:   {task.get('parent')}")
+        
         desc = task.get('description', '')
         if desc:
             click.echo("\nDescription:")
@@ -166,15 +260,51 @@ def complete_task(task_id: str, note: Optional[str] = None):
     try:
         client = ClickUpClient(config.get('auth.access_token'))
         
-        # Update status to complete
-        # ClickUp statuses are case-sensitive usually, 'complete' or 'Closed'
-        # We try 'complete' first
-        client.update_task(task_id, {'status': 'complete'})
+        # Get task to find its list_id and current status
+        task = client.get_task(task_id)
+        list_id = task.get('list', {}).get('id')
+        
+        if not list_id:
+            print_error(f"Could not find list for task {task_id}")
+            return
+            
+        # Get statuses for this list to find a 'closed' one
+        # ClickUp API: /list/{list_id} returns everything about the list
+        list_data = client._make_request('GET', f'/list/{list_id}')
+        statuses = list_data.get('statuses', [])
+        
+        # If list statuses are empty, it might be using space statuses
+        if not statuses:
+            space_id = task.get('space', {}).get('id')
+            if space_id:
+                space_data = client._make_request('GET', f'/space/{space_id}')
+                statuses = space_data.get('statuses', [])
+        
+        # Find a status with type 'closed'
+        target_status = None
+        for s in statuses:
+            if s.get('type') == 'closed':
+                target_status = s.get('status')
+                break
+        
+        if not target_status:
+            # Try to find 'complete' by name if no closed type found
+            for s in statuses:
+                if s.get('status').lower() in ['complete', 'closed', 'resolved', 'done']:
+                    target_status = s.get('status')
+                    break
+                    
+        if not target_status:
+            # Absolute fallback
+            target_status = 'complete'
+            
+        # Update status
+        client.update_task(task_id, {'status': target_status})
         
         if note:
             client.add_task_comment(task_id, note)
             
-        print_success(f"Task {task_id} marked as complete!")
+        print_success(f"Task {task_id} marked as '{target_status}'!")
         
     except Exception as e:
         print_error(f"Failed to complete task: {e}")
