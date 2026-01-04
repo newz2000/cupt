@@ -8,10 +8,15 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 class ConfigManager:
-    def __init__(self):
-        self.config_dir = Path.home() / ".cupt"
-        self.config_file = self.config_dir / "config.yaml"
-        self.config_dir.mkdir(exist_ok=True)
+    def __init__(self, config_path: Optional[Path] = None):
+        if config_path:
+            self.config_file = config_path
+            self.config_dir = self.config_file.parent
+        else:
+            self.config_dir = Path.home() / ".cupt"
+            self.config_file = self.config_dir / "config.yaml"
+            
+        self.config_dir.mkdir(exist_ok=True, parents=True)
         
         # Ensure config file exists
         if not self.config_file.exists():

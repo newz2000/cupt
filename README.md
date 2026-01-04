@@ -1,93 +1,49 @@
 # CUPT - ClickUp Task Management CLI
 
-A comprehensive command-line interface for ClickUp task management.
+A powerful, modular CLI tool for managing ClickUp tasks directly from your terminal.
 
 ## Features
-
-- Task listing with filtering and sorting
-- Time tracking with start/stop/manual entry
-- Notes and comments management
-- Task completion tracking
-- OAuth authentication
-- Offline capability with caching
+- **Task Listing**: View active, overdue, and upcoming tasks with deep paging support.
+- **Subtask Support**: Visual nesting (`↳`) and parent task resolution.
+- **Hierarchical Context**: `cupt context <id>` shows parents and sibling subtasks.
+- **Time Tracking**: Start/stop timers and add manual time entries.
+- **Note Management**: Quick comments and note listing.
+- **Flexible Auth**: Supports both OAuth and Personal API Tokens.
 
 ## Installation
 
-### From Source (Local Development)
-To use `cupt` from any terminal window on your machine:
-1. Navigate to this directory
-2. Run:
+### Local Installation (for development)
 ```bash
+git clone https://github.com/matthewnuzum/cupt.git
+cd cupt
 pip install -e .
 ```
 
-### From PyPI
-```bash
-pip install cupt
-```
-
-## Quick Start
-
-1. Authenticate with ClickUp:
+### Configuration
 ```bash
 cupt auth
+# Follow prompts to authenticate
 ```
 
-2. List your tasks:
+## Usage
+- `cupt list`: List your active tasks
+- `cupt list --overdue`: Show overdue tasks
+- `cupt show <id>`: Show task details
+- `cupt context <id>`: Show task parent and siblings
+- `cupt done <id>`: Mark task as complete
+- `cupt time start <id>`: Start timer
+- `cupt time stop`: Stop timer
+- `cupt note <id> "Your message"`: Add a note
+
+## Project Structure
+- `cupt/`: Package root.
+- `cupt/services/`: Core business logic (TaskService, TimeService, NoteService).
+- `cupt/api.py`: ClickUp API client wrapper.
+- `cupt/main.py`: CLI entry point.
+- `tests/`: Comprehensive unit tests using `pytest` and mocks.
+
+## Testing
+Run the test suite with coverage:
 ```bash
-cupt list --overdue
+pytest --cov=cupt tests/
 ```
-
-3. Start tracking time on a task:
-```bash
-cupt time start abc123
-```
-
-## Commands
-
-### Authentication
-- `cupt auth` - Authenticate with ClickUp using OAuth
-- `cupt logout` - Clear authentication data
-
-### Task Management
-- `cupt list` - List tasks with optional filters
-- `cupt show <task-id>` - Show task details
-- `cupt done <task-id>` - Mark task as complete
-
-### Time Tracking
-- `cupt time start <task-id>` - Start timer
-- `cupt time stop` - Stop timer
-- `cupt time status` - Show current timer status
-- `cupt time add <task-id> <duration> [-m "message"]` - Add manual time
-
-### Notes Management
-- `cupt note add <task-id> "Note text"` - Add note to task
-- `cupt note list <task-id>` - List task notes
-
-## Examples
-
-```bash
-# List overdue tasks (limit 5)
-cupt list --overdue -n 5
-
-# Show task details with notes
-cupt show abc123 --notes
-
-# Add 2 hours 30 minutes of time to a task
-cupt time add abc123 2h30m -m "API development work"
-
-# Mark task complete with note
-cupt done abc123 --note "Completed after client review"
-```
-
-## Configuration
-
-CUPT stores configuration in `~/.cupt/config.yaml`. You can customize:
-
-- Team ID and default list ID
-- Cache settings
-- Authentication tokens
-
-## License
-
-MIT License
