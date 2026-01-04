@@ -13,6 +13,15 @@ A comprehensive command-line interface for ClickUp task management.
 
 ## Installation
 
+### From Source (Local Development)
+To use `cupt` from any terminal window on your machine:
+1. Navigate to this directory
+2. Run:
+```bash
+pip install -e .
+```
+
+### From PyPI
 ```bash
 pip install cupt
 ```
