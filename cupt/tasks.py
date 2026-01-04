@@ -337,3 +337,127 @@ def complete_task(task_id: str, note: Optional[str] = None):
         
     except Exception as e:
         print_error(f"Failed to complete task: {e}")
+@click.command(name='context')
+@click.argument('task_id')
+@click.option('--show-completed', is_flag=True, help='Include completed subtasks')
+def context_cmd(task_id, show_completed):
+    """Show task context (parent, siblings, subtasks)"""
+    return show_context(task_id, show_completed)
+
+def show_context(task_id: str, show_completed: bool = False):
+    """Logic for showing task context"""
+    config = ConfigManager()
+    
+    if not config.is_authenticated():
+        print_error("Not authenticated. Run 'cupt auth' to authenticate.")
+        return
+    
+    try:
+        client = ClickUpClient(config.get('auth.access_token'))
+        task = client.get_task(task_id)
+        
+        if not task:
+            print_error(f"Task {task_id} not found")
+            return
+            
+        # 1. Show Current Task Details
+        click.echo(f"\nCONTEXT FOR TASK: {task.get('name')}")
+        click.echo("=" * 60)
+        click.echo(f"ID:       {task.get('id')}")
+        click.echo(f"Status:   {task.get('status', {}).get('status', 'unknown').upper()}")
+        click.echo(f"Due Date: {format_date(task.get('due_date'))}")
+        
+        desc = task.get('description', '')
+        if desc:
+            click.echo("\nDescription:")
+            click.echo("-" * 20)
+            click.echo(desc)
+            
+        # Show Notes (Comments)
+        click.echo("\nNotes:")
+        click.echo("-" * 20)
+        comments = client.get_task_comments(task_id)
+        if not comments:
+            click.echo("No notes found.")
+        for msg in comments:
+            author = msg.get('user', {}).get('username', 'Unknown')
+            text = msg.get('text', '')
+            click.echo(f"[{author}]: {text}")
+
+        # 2. Show Parent Details
+        p_id = task.get('parent')
+        if p_id:
+            click.echo("\n" + "=" * 60)
+            click.echo(f"PARENT TASK")
+            click.echo("=" * 60)
+            try:
+                parent_task = client.get_task(p_id)
+                click.echo(f"Name:     {parent_task.get('name')}")
+                click.echo(f"ID:       {p_id}")
+                click.echo(f"Status:   {parent_task.get('status', {}).get('status', 'unknown').upper()}")
+                
+                p_desc = parent_task.get('description', '')
+                if p_desc:
+                    click.echo("\nParent Description:")
+                    click.echo("-" * 20)
+                    click.echo(p_desc)
+            except Exception:
+                click.echo(f"ID:       {p_id} (Metadata fetch failed)")
+        else:
+            click.echo("\n" + "=" * 60)
+            click.echo("PARENT TASK: (Top Level Task)")
+            click.echo("=" * 60)
+
+        # 3. Show Siblings (or subtasks if top level)
+        # If it has a parent, show all subtasks of that parent (siblings)
+        # If it has no parent, show its own subtasks
+        click.echo("\n" + "=" * 60)
+        if p_id:
+            click.echo(f"SIBLINGS (Subtasks of {p_id})")
+            target_parent = p_id
+        else:
+            click.echo(f"SUBTASKS (of {task_id})")
+            target_parent = task_id
+        click.echo("=" * 60)
+        
+        # Fetch chores for the target parent
+        # We use a team-level fetch with parent filter to get everything
+        team_id = config.get('user.team_id')
+        params = {
+            'parent': target_parent,
+            'include_subtasks': 'true',
+            'subtasks': 'true'
+        }
+        if show_completed:
+            params['include_closed'] = 'true'
+            
+        resp = client._make_request('GET', f'/team/{team_id}/task', params=params)
+        siblings = resp.get('tasks', [])
+        
+        # Local filter for active unless show_completed
+        if not show_completed:
+            siblings = [s for s in siblings if s.get('status', {}).get('type') not in ['done', 'closed']]
+            
+        if not siblings:
+            click.echo("No relevant subtasks found.")
+        else:
+            click.echo(f"{'ID':<12} {'Status':<12} {'Name'}")
+            click.echo("-" * 60)
+            for s in siblings:
+                s_id = s.get('id')
+                s_status = s.get('status', {}).get('status', 'unknown').upper()
+                s_name = s.get('name', 'No name')
+                
+                # Highlight current task
+                if s_id == task_id:
+                    marker = ">> "
+                else:
+                    marker = "   "
+                    
+                click.echo(f"{marker}{s_id:<9} {s_status:<12} {s_name}")
+        
+        click.echo("\n")
+        
+    except Exception as e:
+        print_error(f"Failed to show context: {e}")
+

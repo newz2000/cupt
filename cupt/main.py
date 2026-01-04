@@ -8,7 +8,7 @@ import sys
 from cupt.config import ConfigManager
 from cupt.auth import OAuthManager
 from cupt.api import ClickUpClient
-from cupt.tasks import list_tasks_cmd, show_task_cmd, complete_task_cmd
+from cupt.tasks import list_tasks_cmd, show_task_cmd, complete_task_cmd, context_cmd
 from cupt.time_tracker import time_group
 from cupt.notes import add_note, list_notes
 from cupt.utils import print_error, print_success, print_warning
@@ -192,6 +192,7 @@ def config(team_id, default_list, api_token, show):
 cli.add_command(list_tasks_cmd)
 cli.add_command(show_task_cmd)
 cli.add_command(complete_task_cmd)
+cli.add_command(context_cmd)
 
 cli.add_command(time_group)
 
