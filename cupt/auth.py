@@ -168,18 +168,15 @@ class OAuthManager:
             response.raise_for_status()
             tokens = response.json()
             
-            print_info(f"Token response: {tokens}")
-            
             if 'access_token' in tokens:
                 # Store tokens in config
                 self.config.set('auth.access_token', tokens['access_token'])
                 if 'refresh_token' in tokens:
                     self.config.set('auth.refresh_token', tokens['refresh_token'])
-                
-                # Store client credentials
+
+                # Store client identifier (do not persist client_secret)
                 self.config.set('auth.client_id', self.client_id)
-                self.config.set('auth.client_secret', self.client_secret)
-                
+
                 print_success("Authentication successful!")
                 return tokens
             else:
@@ -189,8 +186,6 @@ class OAuthManager:
                 
         except requests.exceptions.RequestException as e:
             print_error(f"Failed to exchange code for tokens: {e}")
-            if hasattr(e, 'response') and e.response is not None:
-                print_error(f"Response text: {e.response.text}")
             return None
         except ValueError as e:
             print_error(f"Invalid response from token endpoint: {e}")
