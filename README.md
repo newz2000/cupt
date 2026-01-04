@@ -12,10 +12,23 @@ A powerful, modular CLI tool for managing ClickUp tasks directly from your termi
 
 ## Installation
 
-### Local Installation (for development)
+### Recommended: System-wide using `pipx`
+MacOS (Homebrew) prevents installing packages directly into the system Python. Use `pipx` to install `cupt` in an isolated environment that is globally available:
+
+```bash
+# From the project root
+pipx install .
+```
+
+If you don't have `pipx`, install it via Homebrew: `brew install pipx && pipx ensurepath`.
+
+### Development: Local Editable Install
+If you are developing or want an isolated virtual environment:
 ```bash
 git clone https://github.com/matthewnuzum/cupt.git
 cd cupt
+python -m venv venv
+source venv/bin/activate
 pip install -e .
 ```
 
