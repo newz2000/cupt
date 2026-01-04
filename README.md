@@ -48,15 +48,26 @@ cupt auth
 - `cupt time stop`: Stop timer
 - `cupt note <id> "Your message"`: Add a note
 
+## Testing
+`cupt` is built with a strong focus on stability and testability.
+- **Coverage**: 75% total coverage
+- **Tests**: 47 unit tests using `pytest` and mocks.
+
+Run the test suite:
+```bash
+pytest --cov=cupt tests/
+```
+
+## Future Roadmap
+Exciting features planned for upcoming releases:
+- **`cupt work` / `cupt gtd`**: Sequential "focused work" mode to tackle a list of tasks one by one.
+- **Quick Create**: Rapidly create follow-up tasks or subtasks while you work.
+- **Workflow State**: Persistent session state for long-running workflows.
+- **Shell Completion**: Tab-completion for task IDs and commands.
+
 ## Project Structure
 - `cupt/`: Package root.
 - `cupt/services/`: Core business logic (TaskService, TimeService, NoteService).
 - `cupt/api.py`: ClickUp API client wrapper.
 - `cupt/main.py`: CLI entry point.
-- `tests/`: Comprehensive unit tests using `pytest` and mocks.
-
-## Testing
-Run the test suite with coverage:
-```bash
-pytest --cov=cupt tests/
-```
+- `tests/`: Comprehensive unit tests.
