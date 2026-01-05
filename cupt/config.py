@@ -16,6 +16,8 @@ class ConfigManager:
             self.config_dir = Path.home() / ".cupt"
             self.config_file = self.config_dir / "config.yaml"
             
+        self.cache_file = self.config_dir / "parent_cache.json"
+        
         self.config_dir.mkdir(exist_ok=True, parents=True)
         
         # Ensure config file exists
@@ -94,3 +96,26 @@ class ConfigManager:
         """Check if user is authenticated"""
         token = self.get('auth.access_token')
         return token is not None and len(token) > 0
+
+    def load_cache(self) -> Dict[str, Any]:
+        """Load persistent cache from JSON file"""
+        import json
+        if not self.cache_file.exists():
+            return {}
+        try:
+            with open(self.cache_file, 'r') as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def save_cache(self, cache_data: Dict[str, Any]):
+        """Save persistent cache to JSON file"""
+        import json
+        with open(self.cache_file, 'w') as f:
+            json.dump(cache_data, f)
+        os.chmod(self.cache_file, 0o600)
+
+    def clear_cache(self):
+        """Delete the persistent cache file"""
+        if self.cache_file.exists():
+            self.cache_file.unlink()

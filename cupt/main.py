@@ -153,10 +153,16 @@ def status():
 @click.option('--team-id', help='Set default team ID')
 @click.option('--default-list', help='Set default list ID')
 @click.option('--api-token', help='Set Personal API Token (starts with pk_)')
+@click.option('--clear-cache', is_flag=True, help='Clear persistent parent name cache')
 @click.option('--show', is_flag=True, help='Show current configuration')
-def config(team_id, default_list, api_token, show):
+def config(team_id, default_list, api_token, clear_cache, show):
     """Manage configuration"""
     config_manager = ConfigManager()
+    
+    if clear_cache:
+        config_manager.clear_cache()
+        print_success("Persistent cache cleared")
+        return
     
     if show:
         click.echo("Current configuration:")

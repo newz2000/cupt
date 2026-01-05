@@ -75,15 +75,36 @@ class TaskService:
         
         return all_tasks
 
-    def resolve_parent_names(self, tasks: List[Dict[str, Any]], parent_cache: Dict[str, str]) -> None:
-        """Enrich tasks with parent names using a local cache"""
+    def resolve_parent_names(self, team_id: str, tasks: List[Dict[str, Any]], parent_cache: Dict[str, str]) -> None:
+        """Enrich tasks with parent names using a local cache and bulk API calls"""
+        missing_ids = []
         for task in tasks:
             p_id = task.get('parent')
             if p_id and p_id not in parent_cache:
-                try:
-                    parent_task = self.client.get_task(p_id)
-                    parent_cache[p_id] = parent_task.get('name', p_id)
-                except Exception:
+                missing_ids.append(p_id)
+        
+        if not missing_ids:
+            return
+
+        # Fetch missing parents in bulk
+        try:
+            # Remove duplicates from missing_ids
+            unique_missing = list(set(missing_ids))
+            # Fetch up to 100 at a time (ClickUp limit)
+            for i in range(0, len(unique_missing), 100):
+                chunk = unique_missing[i:i+100]
+                parent_tasks = self.client.get_tasks_by_ids(team_id, chunk)
+                for pt in parent_tasks:
+                    parent_cache[pt['id']] = pt.get('name', pt['id'])
+            
+            # For any still missing (e.g. not found), set to ID to avoid repeated fetching
+            for p_id in unique_missing:
+                if p_id not in parent_cache:
+                    parent_cache[p_id] = p_id
+        except Exception:
+            # Fallback to just using ID if bulk fetch fails
+            for p_id in missing_ids:
+                if p_id not in parent_cache:
                     parent_cache[p_id] = p_id
 
     def get_task_context(self, task_id: str, team_id: str, show_completed: bool = False) -> Dict[str, Any]:

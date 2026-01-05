@@ -62,9 +62,14 @@ def list_tasks(overdue=False, today=False, week=False, limit=None, verbose=False
         if limit:
             tasks = tasks[:limit]
 
-        # Resolve parent names for subtasks
-        parent_cache = {t['id']: t['name'] for t in tasks}
-        service.resolve_parent_names(tasks, parent_cache)
+        # Resolve parent names for subtasks (with persistent cache)
+        parent_cache = config.load_cache()
+        # Seed cache with known names from current task list
+        for t in tasks:
+            parent_cache[t['id']] = t['name']
+            
+        service.resolve_parent_names(selected_team_id, tasks, parent_cache)
+        config.save_cache(parent_cache)
             
         # Display tasks
         click.echo(f"\n{'ID':<12} {'Status':<12} {'Due':<18} {'Name'}")

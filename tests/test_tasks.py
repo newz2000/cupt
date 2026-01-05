@@ -16,6 +16,7 @@ def mock_config():
         'user.user_id': 'user1',
         'auth.access_token': 'token123'
     }.get(key, default)
+    config.load_cache.return_value = {}
     return config
 
 @pytest.fixture

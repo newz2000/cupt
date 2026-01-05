@@ -18,6 +18,9 @@ MacOS (Homebrew) prevents installing packages directly into the system Python. U
 ```bash
 # From the project root
 pipx install .
+
+# To update an existing installation after code changes:
+pipx install --force .
 ```
 
 If you don't have `pipx`, install it via Homebrew: `brew install pipx && pipx ensurepath`.

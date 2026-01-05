@@ -32,13 +32,13 @@ def test_list_tasks_filtering(service, mock_client):
 
 def test_resolve_parent_names(service, mock_client):
     tasks = [{"id": "s1", "parent": "p1"}]
-    mock_client.get_task.return_value = {"name": "Parent Name"}
+    mock_client.get_tasks_by_ids.return_value = [{"id": "p1", "name": "Parent Name"}]
     
     cache = {}
-    service.resolve_parent_names(tasks, cache)
+    service.resolve_parent_names("team1", tasks, cache)
     
     assert cache["p1"] == "Parent Name"
-    mock_client.get_task.assert_called_with("p1")
+    mock_client.get_tasks_by_ids.assert_called_with("team1", ["p1"])
 
 def test_get_task_context(service, mock_client):
     mock_client.get_task.return_value = {"id": "t1", "parent": "p1", "name": "Task 1"}
