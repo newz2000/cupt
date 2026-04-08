@@ -95,6 +95,71 @@ def test_hierarchy_methods(client, mock_session):
     mock_session.get.return_value.json.return_value = {"lists": [{"id": "l1"}]}
     assert client.get_lists("space1")[0]["id"] == "l1"
 
+def test_get_task(client, mock_session):
+    mock_session.get.return_value.json.return_value = {"id": "t1", "name": "Task 1"}
+    mock_session.get.return_value.status_code = 200
+    task = client.get_task("t1")
+    assert task["id"] == "t1"
+
+def test_get_running_timer_returns_none_on_error(client, mock_session):
+    import requests
+    mock_response = MagicMock()
+    mock_response.status_code = 404
+    mock_response.text = "Not found"
+    mock_response.json.return_value = {}
+    mock_session.get.return_value.raise_for_status.side_effect = requests.exceptions.HTTPError(
+        response=mock_response
+    )
+    result = client.get_running_timer("team1")
+    assert result is None
+
+def test_get_task_comments(client, mock_session):
+    mock_session.get.return_value.json.return_value = {"comments": [{"id": "c1"}]}
+    mock_session.get.return_value.status_code = 200
+    comments = client.get_task_comments("t1")
+    assert len(comments) == 1
+    assert comments[0]["id"] == "c1"
+
+def test_add_task_comment(client, mock_session):
+    mock_session.post.return_value.json.return_value = {"id": "c1"}
+    mock_session.post.return_value.status_code = 200
+    res = client.add_task_comment("t1", "Hello")
+    assert res["id"] == "c1"
+    _, kwargs = mock_session.post.call_args
+    assert kwargs['json']['comment_text'] == "Hello"
+
+def test_api_json_decode_error(client, mock_session):
+    import json
+    mock_session.get.return_value.status_code = 200
+    mock_session.get.return_value.raise_for_status.return_value = None
+    mock_session.get.return_value.json.side_effect = json.JSONDecodeError("error", "", 0)
+    with pytest.raises(Exception) as excinfo:
+        client.get_user()
+    assert "Invalid JSON" in str(excinfo.value)
+
+def test_get_task_children(client, mock_session):
+    mock_session.get.return_value.json.return_value = {"tasks": [{"id": "s1"}]}
+    mock_session.get.return_value.status_code = 200
+    children = client.get_task_children("team1", "parent1")
+    assert children[0]["id"] == "s1"
+    _, kwargs = mock_session.get.call_args
+    assert kwargs["params"]["parent"] == "parent1"
+
+
+def test_get_list_statuses(client, mock_session):
+    mock_session.get.return_value.json.return_value = {"statuses": [{"status": "Done", "type": "closed"}]}
+    mock_session.get.return_value.status_code = 200
+    statuses = client.get_list_statuses("l1")
+    assert statuses[0]["status"] == "Done"
+
+
+def test_get_space_statuses(client, mock_session):
+    mock_session.get.return_value.json.return_value = {"statuses": [{"status": "Done", "type": "closed"}]}
+    mock_session.get.return_value.status_code = 200
+    statuses = client.get_space_statuses("s1")
+    assert statuses[0]["status"] == "Done"
+
+
 def test_api_error_handling(client, mock_session):
     import requests
     mock_session.get.return_value.status_code = 401

@@ -84,6 +84,24 @@ class ClickUpClient:
     def get_task(self, task_id: str) -> Dict[str, Any]:
         """Get single task by ID"""
         return self._make_request('GET', f'/task/{task_id}')
+
+    def get_task_children(self, team_id: str, parent_id: str, params: Optional[Dict] = None) -> List[Dict[str, Any]]:
+        """Get subtasks of a task (replaces direct _make_request calls in service layer)"""
+        p: Dict = {'parent': parent_id}
+        if params:
+            p.update(params)
+        response = self._make_request('GET', f'/team/{team_id}/task', params=p)
+        return response.get('tasks', [])
+
+    def get_list_statuses(self, list_id: str) -> List[Dict[str, Any]]:
+        """Get available statuses for a list"""
+        response = self._make_request('GET', f'/list/{list_id}')
+        return response.get('statuses', [])
+
+    def get_space_statuses(self, space_id: str) -> List[Dict[str, Any]]:
+        """Get available statuses for a space"""
+        response = self._make_request('GET', f'/space/{space_id}')
+        return response.get('statuses', [])
     
     def update_task(self, task_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Update task"""

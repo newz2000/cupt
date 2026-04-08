@@ -4,7 +4,7 @@ Utility functions for CUPT CLI (basic version)
 
 import re
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Any, Optional
 
 def parse_duration(duration_str: str) -> Optional[int]:
     """
