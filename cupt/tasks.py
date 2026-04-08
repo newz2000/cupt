@@ -1,10 +1,11 @@
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 import click
 
 from cupt.context import get_client_context
 from cupt.services.task_service import TaskService
-from cupt.utils import format_date, print_error, print_success, print_warning, truncate_text
+from cupt.utils import format_date, format_duration, print_error, print_success, print_warning, truncate_text
 
 
 # ---------------------------------------------------------------------------
@@ -71,8 +72,12 @@ def list_tasks(overdue=False, today=False, week=False, limit=None, verbose=False
         service.resolve_parent_names(active_team_id, tasks, parent_cache)
         config.save_cache(parent_cache)
 
-        click.echo(f"\n{'ID':<12} {'Status':<12} {'Due':<18} {'Name'}")
-        click.echo("-" * 120)
+        if verbose:
+            click.echo(f"\n{'ID':<12} {'Status':<12} {'Due':<18} {'Assignee':<18} {'Est':<8} {'Tracked':<8} {'Name'}")
+            click.echo("-" * 140)
+        else:
+            click.echo(f"\n{'ID':<12} {'Status':<12} {'Due':<18} {'Name'}")
+            click.echo("-" * 120)
 
         for task in tasks:
             task_id = task.get("id", "No ID")
@@ -86,7 +91,16 @@ def list_tasks(overdue=False, today=False, week=False, limit=None, verbose=False
                 name = f"↳ {name} (sub of {p_name})"
 
             name = truncate_text(name, 75)
-            click.echo(f"{task_id:<12} {status:<12} {due_date:<18} {name}")
+
+            if verbose:
+                individuals = [a.get("username", "?") for a in task.get("assignees", [])]
+                teams = [f"[{g.get('name', '?')}]" for g in task.get("group_assignees", [])]
+                assignee = ", ".join(individuals + teams) or "-"
+                est = format_duration(task.get("time_estimate") or 0) if task.get("time_estimate") else "-"
+                tracked = format_duration(int(task.get("time_spent") or 0)) if task.get("time_spent") else "-"
+                click.echo(f"{task_id:<12} {status:<12} {due_date:<18} {assignee:<18} {est:<8} {tracked:<8} {name}")
+            else:
+                click.echo(f"{task_id:<12} {status:<12} {due_date:<18} {name}")
 
         return tasks
 
@@ -120,6 +134,29 @@ def show_task(task_id: str, include_notes: bool = False):
             print_error(f"Task {task_id} not found")
             return
 
+        p_id = task.get("parent")
+
+        # Fetch parent name and (optionally) notes concurrently.
+        def _fetch_parent():
+            if not p_id:
+                return None
+            try:
+                return client.get_task(p_id)
+            except Exception:
+                return None
+
+        def _fetch_notes():
+            if not include_notes:
+                return []
+            return client.get_task_comments(task_id)
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            fut_parent = executor.submit(_fetch_parent)
+            fut_notes = executor.submit(_fetch_notes)
+
+        parent_task = fut_parent.result()
+        comments = fut_notes.result()
+
         click.echo(f"\nTask: {task.get('name')}")
         click.echo("=" * 40)
         click.echo(f"ID:       {task.get('id')}")
@@ -131,12 +168,10 @@ def show_task(task_id: str, include_notes: bool = False):
         click.echo(f"Folder:   {task.get('folder', {}).get('name', 'N/A')} ({task.get('folder', {}).get('id', 'N/A')})")
         click.echo(f"List:     {task.get('list', {}).get('name', 'N/A')} ({task.get('list', {}).get('id', 'N/A')})")
 
-        p_id = task.get("parent")
         if p_id:
-            try:
-                parent_task = client.get_task(p_id)
+            if parent_task:
                 click.echo(f"Parent:   {parent_task.get('name', 'Unknown')} ({p_id})")
-            except Exception:
+            else:
                 click.echo(f"Parent:   {p_id}")
 
         desc = task.get("description", "")
@@ -148,7 +183,6 @@ def show_task(task_id: str, include_notes: bool = False):
         if include_notes:
             click.echo("\nNotes:")
             click.echo("-" * 20)
-            comments = client.get_task_comments(task_id)
             if not comments:
                 click.echo("No notes found.")
             for msg in comments:

@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -113,14 +114,19 @@ class TaskService:
         except Exception:
             pass
 
-        # Individual fallback for any still-missing parents.
-        for p_id in unique_missing:
-            if p_id not in parent_cache:
+        # Individual fallback for any still-missing parents — fetched concurrently.
+        still_missing = [p_id for p_id in unique_missing if p_id not in parent_cache]
+        if still_missing:
+            def _fetch_one(p_id):
                 try:
                     pt = self.client.get_task(p_id)
-                    parent_cache[p_id] = pt.get("name", p_id)
+                    return p_id, pt.get("name", p_id)
                 except Exception:
-                    parent_cache[p_id] = p_id
+                    return p_id, p_id
+
+            with ThreadPoolExecutor(max_workers=min(len(still_missing), 10)) as executor:
+                for p_id, name in executor.map(_fetch_one, still_missing):
+                    parent_cache[p_id] = name
 
     # ------------------------------------------------------------------
     # Task completion
@@ -180,37 +186,42 @@ class TaskService:
         """
         Fetch a task with its notes, parent, and siblings/subtasks.
 
-        After the initial get_task() call the remaining three fetches
-        (notes, parent, children) are fully independent of each other and
-        are therefore prime candidates for concurrent execution.
-
-        TODO: Replace the sequential block below with ThreadPoolExecutor
-              once parallel fetch is introduced (Phase 3 / offline work).
-              The structure here is intentionally kept fetch-first /
-              assemble-second to make that change a minimal diff.
+        After the initial get_task() call, notes, parent, and children are
+        fetched concurrently via ThreadPoolExecutor(max_workers=3).
         """
         task = self.client.get_task(task_id)
         if not task:
             return None
 
-        # --- sequential fetch block (parallel candidate) ---
-        notes = self.client.get_task_comments(task_id)
-
         p_id = task.get("parent")
-        parent_task = None
-        if p_id:
-            try:
-                parent_task = self.client.get_task(p_id)
-            except Exception:
-                pass
-
         target_parent = p_id if p_id else task_id
         child_params: Dict[str, Any] = {"include_subtasks": "true", "subtasks": "true"}
         if show_completed:
             child_params["include_closed"] = "true"
 
-        siblings = self.client.get_task_children(team_id, target_parent, child_params)
-        # --- end parallel candidate block ---
+        # Notes, parent, and children are independent — fetch them concurrently.
+        def _fetch_notes():
+            return self.client.get_task_comments(task_id)
+
+        def _fetch_parent():
+            if not p_id:
+                return None
+            try:
+                return self.client.get_task(p_id)
+            except Exception:
+                return None
+
+        def _fetch_children():
+            return self.client.get_task_children(team_id, target_parent, child_params)
+
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            fut_notes = executor.submit(_fetch_notes)
+            fut_parent = executor.submit(_fetch_parent)
+            fut_children = executor.submit(_fetch_children)
+
+        notes = fut_notes.result()
+        parent_task = fut_parent.result()
+        siblings = fut_children.result()
 
         if not show_completed:
             siblings = [
