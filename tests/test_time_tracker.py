@@ -30,7 +30,7 @@ def test_time_start_success(runner, mock_config, mock_client):
         
         assert result.exit_code == 0
         assert "Started tracking" in result.output
-        mock_client.start_timer.assert_called_once()
+        mock_client.start_timer.assert_called_once_with('task1')
 
 def test_time_start_already_running(runner, mock_config, mock_client):
     with patch('cupt.time_tracker.ConfigManager', return_value=mock_config), \
@@ -49,6 +49,17 @@ def test_time_stop_success(runner, mock_config, mock_client):
         mock_client.get_running_timer.return_value = {"id": "timer1"}
         result = runner.invoke(time_group, ['stop'])
         
+        assert "Timer stopped" in result.output
+        mock_client.stop_timer.assert_called_once()
+
+def test_time_stop_with_task_id(runner, mock_config, mock_client):
+    with patch('cupt.time_tracker.ConfigManager', return_value=mock_config), \
+         patch('cupt.time_tracker.ClickUpClient', return_value=mock_client):
+        
+        mock_client.get_running_timer.return_value = {"id": "timer1"}
+        result = runner.invoke(time_group, ['stop', 'task1'])
+        
+        assert result.exit_code == 0
         assert "Timer stopped" in result.output
         mock_client.stop_timer.assert_called_once()
 

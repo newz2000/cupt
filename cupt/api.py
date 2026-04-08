@@ -94,6 +94,7 @@ class ClickUpClient:
         data = {}
         if task_id:
             data['task_id'] = task_id
+            data['tid'] = task_id
         
         return self._make_request('POST', f'/team/{team_id}/time_entries/start', data=data)
     
@@ -113,6 +114,7 @@ class ClickUpClient:
         """Add manual time entry"""
         data = {
             'task_id': task_id,
+            'tid': task_id,
             'duration': duration,  # in milliseconds
             'start': int(datetime.now().timestamp() * 1000 - duration),
             'end': int(datetime.now().timestamp() * 1000)

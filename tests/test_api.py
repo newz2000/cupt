@@ -61,6 +61,11 @@ def test_timer_methods(client, mock_session):
     mock_session.post.return_value.status_code = 200
     client.start_timer("team1", "task1")
     
+    # Verify tid is in start payload
+    args, kwargs = mock_session.post.call_args
+    assert kwargs['json']['task_id'] == "task1"
+    assert kwargs['json']['tid'] == "task1"
+    
     # Stop
     client.stop_timer("team1")
     
@@ -74,6 +79,12 @@ def test_add_time_entry(client, mock_session):
     mock_session.post.return_value.status_code = 200
     res = client.add_time_entry("team1", "task1", 3600000, "desc")
     assert res["id"] == "new_entry"
+    
+    # Verify tid is in add payload
+    args, kwargs = mock_session.post.call_args
+    assert kwargs['json']['task_id'] == "task1"
+    assert kwargs['json']['tid'] == "task1"
+    assert kwargs['json']['duration'] == 3600000
 
 def test_hierarchy_methods(client, mock_session):
     # Spaces

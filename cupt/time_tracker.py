@@ -39,7 +39,8 @@ def start_timer(task_id):
         print_error(f"Failed to start timer: {e}")
 
 @time_group.command('stop')
-def stop_timer():
+@click.argument('task_id', required=False)
+def stop_timer(task_id=None):
     """Stop current time tracking"""
     config = ConfigManager()
     if not config.is_authenticated():

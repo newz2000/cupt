@@ -87,24 +87,24 @@ class TaskService:
             return
 
         # Fetch missing parents in bulk
+        unique_missing = list(set(missing_ids))
         try:
-            # Remove duplicates from missing_ids
-            unique_missing = list(set(missing_ids))
             # Fetch up to 100 at a time (ClickUp limit)
             for i in range(0, len(unique_missing), 100):
                 chunk = unique_missing[i:i+100]
                 parent_tasks = self.client.get_tasks_by_ids(team_id, chunk)
                 for pt in parent_tasks:
                     parent_cache[pt['id']] = pt.get('name', pt['id'])
-            
-            # For any still missing (e.g. not found), set to ID to avoid repeated fetching
-            for p_id in unique_missing:
-                if p_id not in parent_cache:
-                    parent_cache[p_id] = p_id
         except Exception:
-            # Fallback to just using ID if bulk fetch fails
-            for p_id in missing_ids:
-                if p_id not in parent_cache:
+            pass
+
+        # Fall back to individual lookups for any still missing
+        for p_id in unique_missing:
+            if p_id not in parent_cache:
+                try:
+                    pt = self.client.get_task(p_id)
+                    parent_cache[p_id] = pt.get('name', p_id)
+                except Exception:
                     parent_cache[p_id] = p_id
 
     def get_task_context(self, task_id: str, team_id: str, show_completed: bool = False) -> Dict[str, Any]:
