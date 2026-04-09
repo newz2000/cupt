@@ -4,7 +4,8 @@ import click
 
 from cupt.context import get_client_context
 from cupt.services.time_service import TimeService
-from cupt.utils import format_duration, parse_duration, print_error, print_success, print_warning
+from cupt.utils import (format_duration, parse_duration, print_error,
+                        print_success, print_warning)
 
 
 @click.group(name="time")

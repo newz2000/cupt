@@ -1,5 +1,7 @@
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
 from cupt.api import ClickUpClient
+
 
 class TimeService:
     def __init__(self, client: ClickUpClient, team_id: str):
@@ -18,6 +20,10 @@ class TimeService:
         """Stop current tracking"""
         return self.client.stop_timer(self.team_id)
 
-    def add_manual_time(self, task_id: str, duration_ms: int, description: Optional[str] = None) -> Dict[str, Any]:
+    def add_manual_time(
+        self, task_id: str, duration_ms: int, description: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Add a manual time entry"""
-        return self.client.add_time_entry(self.team_id, task_id, duration_ms, description)
+        return self.client.add_time_entry(
+            self.team_id, task_id, duration_ms, description
+        )

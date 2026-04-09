@@ -1,6 +1,8 @@
 from unittest.mock import patch
-from cupt.notes import add_note, list_notes
+
 from click.testing import CliRunner
+
+from cupt.notes import add_note, list_notes
 
 _MODULE = "cupt.notes.get_client_context"
 

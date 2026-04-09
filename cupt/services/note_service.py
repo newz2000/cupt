@@ -1,5 +1,7 @@
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
 from cupt.api import ClickUpClient
+
 
 class NoteService:
     def __init__(self, client: ClickUpClient):

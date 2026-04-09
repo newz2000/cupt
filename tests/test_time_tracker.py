@@ -1,5 +1,7 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from cupt.time_tracker import time_group
 
 _MODULE = "cupt.time_tracker.get_client_context"
@@ -12,6 +14,7 @@ def _ctx(mock_config, mock_client, team_id="team1"):
 # ---------------------------------------------------------------------------
 # start
 # ---------------------------------------------------------------------------
+
 
 def test_time_start_success(runner, mock_config, mock_client):
     with patch(_MODULE, return_value=_ctx(mock_config, mock_client)):
@@ -47,6 +50,7 @@ def test_time_auth_error(runner):
 # stop
 # ---------------------------------------------------------------------------
 
+
 def test_time_stop_success(runner, mock_config, mock_client):
     with patch(_MODULE, return_value=_ctx(mock_config, mock_client)):
         mock_client.get_running_timer.return_value = {"id": "timer1"}
@@ -80,6 +84,7 @@ def test_stop_timer_not_running(runner, mock_config, mock_client):
 # status
 # ---------------------------------------------------------------------------
 
+
 def test_time_status_running(runner, mock_config, mock_client):
     with patch(_MODULE, return_value=_ctx(mock_config, mock_client)):
         mock_client.get_running_timer.return_value = {
@@ -107,6 +112,7 @@ def test_timer_status_no_timer(runner, mock_config, mock_client):
 # ---------------------------------------------------------------------------
 # add
 # ---------------------------------------------------------------------------
+
 
 def test_time_add_success(runner, mock_config, mock_client):
     with patch(_MODULE, return_value=_ctx(mock_config, mock_client)):

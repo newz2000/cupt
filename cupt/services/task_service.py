@@ -1,8 +1,11 @@
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from cupt.api import ClickUpClient
+
+logger = logging.getLogger(__name__)
 
 
 class TaskService:
@@ -25,15 +28,23 @@ class TaskService:
             filters["order_by"] = "due_date"
             filters["reverse"] = True
         elif today:
-            today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            today_start = datetime.now().replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
             filters["due_date_gt"] = int(today_start.timestamp() * 1000)
-            filters["due_date_lt"] = int((today_start + timedelta(days=1)).timestamp() * 1000)
+            filters["due_date_lt"] = int(
+                (today_start + timedelta(days=1)).timestamp() * 1000
+            )
             filters["order_by"] = "due_date"
             filters["reverse"] = False
         elif week:
-            week_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            week_start = datetime.now().replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
             filters["due_date_gt"] = int(week_start.timestamp() * 1000)
-            filters["due_date_lt"] = int((week_start + timedelta(days=7)).timestamp() * 1000)
+            filters["due_date_lt"] = int(
+                (week_start + timedelta(days=7)).timestamp() * 1000
+            )
             filters["order_by"] = "due_date"
             filters["reverse"] = False
 
@@ -74,7 +85,11 @@ class TaskService:
             filtered = (
                 tasks
                 if include_closed
-                else [t for t in tasks if t.get("status", {}).get("type") not in ("done", "closed")]
+                else [
+                    t
+                    for t in tasks
+                    if t.get("status", {}).get("type") not in ("done", "closed")
+                ]
             )
             all_tasks.extend(filtered)
 
@@ -82,6 +97,9 @@ class TaskService:
                 break
             page += 1
 
+        logger.debug(
+            "list_tasks: fetched %d tasks over %d page(s)", len(all_tasks), page + 1
+        )
         all_tasks.sort(
             key=lambda t: (
                 t.get("due_date") is None,
@@ -109,7 +127,9 @@ class TaskService:
         # current filter view).
         try:
             for i in range(0, len(unique_missing), 100):
-                for pt in self.client.get_tasks_by_ids(team_id, unique_missing[i : i + 100]):
+                for pt in self.client.get_tasks_by_ids(
+                    team_id, unique_missing[i : i + 100]
+                ):
                     parent_cache[pt["id"]] = pt.get("name", pt["id"])
         except Exception:
             pass
@@ -117,6 +137,7 @@ class TaskService:
         # Individual fallback for any still-missing parents — fetched concurrently.
         still_missing = [p_id for p_id in unique_missing if p_id not in parent_cache]
         if still_missing:
+
             def _fetch_one(p_id):
                 try:
                     pt = self.client.get_task(p_id)
@@ -124,7 +145,9 @@ class TaskService:
                 except Exception:
                     return p_id, p_id
 
-            with ThreadPoolExecutor(max_workers=min(len(still_missing), 10)) as executor:
+            with ThreadPoolExecutor(
+                max_workers=min(len(still_missing), 10)
+            ) as executor:
                 for p_id, name in executor.map(_fetch_one, still_missing):
                     parent_cache[p_id] = name
 
@@ -166,7 +189,11 @@ class TaskService:
         if not target_status:
             _DONE_NAMES = {"complete", "closed", "resolved", "done"}
             target_status = next(
-                (s["status"] for s in statuses if s.get("status", "").lower() in _DONE_NAMES),
+                (
+                    s["status"]
+                    for s in statuses
+                    if s.get("status", "").lower() in _DONE_NAMES
+                ),
                 "complete",
             )
 
@@ -225,7 +252,8 @@ class TaskService:
 
         if not show_completed:
             siblings = [
-                s for s in siblings
+                s
+                for s in siblings
                 if s.get("status", {}).get("type") not in ("done", "closed")
             ]
 

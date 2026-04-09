@@ -3,12 +3,17 @@ ClickUp API client
 """
 
 import json
+import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+
+from cupt.exceptions import APIError
+
+logger = logging.getLogger(__name__)
 
 
 class ClickUpClient:
@@ -20,10 +25,12 @@ class ClickUpClient:
     def __init__(self, access_token: str):
         self.access_token = access_token
         self.session = requests.Session()
-        self.session.headers.update({
-            "Authorization": self.access_token,
-            "Content-Type": "application/json",
-        })
+        self.session.headers.update(
+            {
+                "Authorization": self.access_token,
+                "Content-Type": "application/json",
+            }
+        )
 
         # Retry transient server errors with exponential backoff.
         # Retries: 500/502/503/504 only — not 4xx client errors.
@@ -48,6 +55,7 @@ class ClickUpClient:
     ) -> Dict[str, Any]:
         """Make an API request with error handling, timeout, and retry."""
         url = f"{self.BASE_URL}/{endpoint.lstrip('/')}"
+        logger.debug("%s %s params=%s", method.upper(), url, params)
 
         try:
             if method.upper() == "GET":
@@ -72,13 +80,20 @@ class ClickUpClient:
                     error_msg += f": {error_data.get('err', '')}"
                 except json.JSONDecodeError:
                     error_msg += f": {e.response.text[:200]}"
-            raise Exception(error_msg)
+            logger.debug("API error on %s %s: %s", method, endpoint, error_msg)
+            raise APIError(error_msg)
         except requests.exceptions.Timeout:
-            raise Exception(f"Request timed out after {self.TIMEOUT}s: {endpoint}")
+            msg = f"Request timed out after {self.TIMEOUT}s: {endpoint}"
+            logger.debug(msg)
+            raise APIError(msg)
         except requests.exceptions.RequestException as e:
-            raise Exception(f"Request failed: {e}")
+            msg = f"Request failed: {e}"
+            logger.debug(msg)
+            raise APIError(msg)
         except json.JSONDecodeError as e:
-            raise Exception(f"Invalid JSON response: {e}")
+            msg = f"Invalid JSON response: {e}"
+            logger.debug(msg)
+            raise APIError(msg)
 
     # ------------------------------------------------------------------
     # Auth / user
@@ -94,28 +109,40 @@ class ClickUpClient:
     # Tasks
     # ------------------------------------------------------------------
 
-    def get_team_tasks(self, team_id: str, filters: Optional[Dict] = None) -> List[Dict[str, Any]]:
+    def get_team_tasks(
+        self, team_id: str, filters: Optional[Dict] = None
+    ) -> List[Dict[str, Any]]:
         params: Dict = {}
         if filters:
             params.update(filters)
-        return self._make_request("GET", f"/team/{team_id}/task", params=params).get("tasks", [])
+        return self._make_request("GET", f"/team/{team_id}/task", params=params).get(
+            "tasks", []
+        )
 
-    def get_tasks_by_ids(self, team_id: str, task_ids: List[str]) -> List[Dict[str, Any]]:
+    def get_tasks_by_ids(
+        self, team_id: str, task_ids: List[str]
+    ) -> List[Dict[str, Any]]:
         """Bulk-fetch up to 100 tasks by ID."""
         if not task_ids:
             return []
         params = {"ids[]": task_ids[:100], "include_subtasks": "true"}
-        return self._make_request("GET", f"/team/{team_id}/task", params=params).get("tasks", [])
+        return self._make_request("GET", f"/team/{team_id}/task", params=params).get(
+            "tasks", []
+        )
 
     def get_task(self, task_id: str) -> Dict[str, Any]:
         return self._make_request("GET", f"/task/{task_id}")
 
-    def get_task_children(self, team_id: str, parent_id: str, params: Optional[Dict] = None) -> List[Dict[str, Any]]:
+    def get_task_children(
+        self, team_id: str, parent_id: str, params: Optional[Dict] = None
+    ) -> List[Dict[str, Any]]:
         """Fetch direct subtasks of a task."""
         p: Dict = {"parent": parent_id}
         if params:
             p.update(params)
-        return self._make_request("GET", f"/team/{team_id}/task", params=p).get("tasks", [])
+        return self._make_request("GET", f"/team/{team_id}/task", params=p).get(
+            "tasks", []
+        )
 
     def update_task(self, task_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         return self._make_request("PUT", f"/task/{task_id}", data=data)
@@ -137,31 +164,64 @@ class ClickUpClient:
     def get_task_comments(self, task_id: str) -> List[Dict[str, Any]]:
         return self._make_request("GET", f"/task/{task_id}/comment").get("comments", [])
 
-    def add_task_comment(self, task_id: str, comment_text: str, notify_all: bool = False) -> Dict[str, Any]:
-        data = {"comment_text": comment_text, "notify_all": notify_all, "assignee": None}
+    def add_task_comment(
+        self, task_id: str, comment_text: str, notify_all: bool = False
+    ) -> Dict[str, Any]:
+        data = {
+            "comment_text": comment_text,
+            "notify_all": notify_all,
+            "assignee": None,
+        }
         return self._make_request("POST", f"/task/{task_id}/comment", data=data)
 
     # ------------------------------------------------------------------
     # Time tracking
     # ------------------------------------------------------------------
 
-    def start_timer(self, team_id: str, task_id: Optional[str] = None) -> Dict[str, Any]:
+    def start_timer(
+        self, team_id: str, task_id: Optional[str] = None
+    ) -> Dict[str, Any]:
         data: Dict = {}
         if task_id:
             data["task_id"] = task_id
             data["tid"] = task_id
-        return self._make_request("POST", f"/team/{team_id}/time_entries/start", data=data)
+        return self._make_request(
+            "POST", f"/team/{team_id}/time_entries/start", data=data
+        )
 
     def stop_timer(self, team_id: str) -> Dict[str, Any]:
         return self._make_request("POST", f"/team/{team_id}/time_entries/stop")
 
     def get_running_timer(self, team_id: str) -> Optional[Dict[str, Any]]:
         try:
-            return self._make_request("GET", f"/team/{team_id}/time_entries/current").get("data")
+            return self._make_request(
+                "GET", f"/team/{team_id}/time_entries/current"
+            ).get("data")
         except Exception:
             return None
 
-    def add_time_entry(self, team_id: str, task_id: str, duration: int, description: Optional[str] = None) -> Dict[str, Any]:
+    def get_time_entries(
+        self,
+        team_id: str,
+        start_date: int,
+        end_date: int,
+        user_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Fetch time entries within a date range (timestamps in ms)."""
+        params: Dict = {"start_date": start_date, "end_date": end_date}
+        if user_id:
+            params["assignee"] = user_id
+        return self._make_request(
+            "GET", f"/team/{team_id}/time_entries", params=params
+        ).get("data", [])
+
+    def add_time_entry(
+        self,
+        team_id: str,
+        task_id: str,
+        duration: int,
+        description: Optional[str] = None,
+    ) -> Dict[str, Any]:
         now_ms = int(datetime.now().timestamp() * 1000)
         data: Dict = {
             "task_id": task_id,

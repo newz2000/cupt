@@ -4,9 +4,10 @@ Configuration management for CUPT CLI
 
 import json
 import os
-import yaml
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+import yaml
 
 
 class ConfigManager:
@@ -19,9 +20,15 @@ class ConfigManager:
             self.config_file = self.config_dir / "config.yaml"
 
         self.cache_file = self.config_dir / "parent_cache.json"
-        self._config: Optional[Dict[str, Any]] = None  # in-memory cache; valid for lifetime of this instance
+        self.task_cache_file = self.config_dir / "tasks_cache.json"
+        self._config: Optional[Dict[str, Any]] = (
+            None  # in-memory cache; valid for lifetime of this instance
+        )
+
+        self.task_cache_dir = self.config_dir / "task_cache"
 
         self.config_dir.mkdir(exist_ok=True, parents=True)
+        self.task_cache_dir.mkdir(exist_ok=True)
 
         if not self.config_file.exists():
             self._create_default_config()
@@ -108,6 +115,50 @@ class ConfigManager:
         os.chmod(self.cache_file, 0o600)
 
     def clear_cache(self):
-        """Delete the persistent cache file."""
+        """Delete all persistent cache files (parent names, task list, task details)."""
         if self.cache_file.exists():
             self.cache_file.unlink()
+        if self.task_cache_file.exists():
+            self.task_cache_file.unlink()
+        for f in self.task_cache_dir.glob("*.json"):
+            f.unlink()
+
+    def save_task_cache(self, data: Dict[str, Any]) -> None:
+        """Persist task list cache to disk (used for --offline mode)."""
+        try:
+            with open(self.task_cache_file, "w") as f:
+                json.dump(data, f)
+            os.chmod(self.task_cache_file, 0o600)
+        except Exception:
+            pass  # cache write failure is non-fatal
+
+    def save_task_detail(self, task_id: str, data: Dict[str, Any]) -> None:
+        """Persist full task detail (task, parent, comments) to a per-task JSON file."""
+        try:
+            path = self.task_cache_dir / f"{task_id}.json"
+            with open(path, "w") as f:
+                json.dump(data, f)
+            os.chmod(path, 0o600)
+        except Exception:
+            pass  # cache write failure is non-fatal
+
+    def load_task_detail(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Load cached task detail. Returns None if missing or unreadable."""
+        path = self.task_cache_dir / f"{task_id}.json"
+        if not path.exists():
+            return None
+        try:
+            with open(path, "r") as f:
+                return json.load(f)
+        except Exception:
+            return None
+
+    def load_task_cache(self) -> Optional[Dict[str, Any]]:
+        """Load task list cache from disk. Returns None if missing or unreadable."""
+        if not self.task_cache_file.exists():
+            return None
+        try:
+            with open(self.task_cache_file, "r") as f:
+                return json.load(f)
+        except Exception:
+            return None

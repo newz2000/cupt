@@ -15,9 +15,10 @@ Pattern for auth-error tests (testing the guard itself):
         ...
 """
 
+from unittest.mock import MagicMock
+
 import pytest
 from click.testing import CliRunner
-from unittest.mock import MagicMock
 
 
 @pytest.fixture
