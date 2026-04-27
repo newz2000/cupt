@@ -7,8 +7,32 @@ import click
 
 from cupt.context import get_client_context
 from cupt.services.task_service import TaskService
-from cupt.utils import (format_date, format_duration, print_error,
-                        print_success, print_warning, truncate_text)
+from cupt.utils import (format_date, format_duration, get_terminal_width,
+                        print_error, print_success, print_warning,
+                        truncate_text)
+
+# Fixed column widths in the list view (excluding the trailing name column).
+# Non-verbose: "{id:<12} {status:<12} {due:<18} {name}" -> 12+1+12+1+18+1 = 45
+# Verbose adds " {assignee:<18} {est:<8} {tracked:<8}" -> +18+1+8+1+8+1 = 37
+_LIST_FIXED_WIDTH = 45
+_LIST_FIXED_WIDTH_VERBOSE = 82
+
+
+def _name_column_width(verbose: bool) -> Optional[int]:
+    """Available columns for the name field, or None when output isn't a TTY."""
+    width = get_terminal_width()
+    if width is None:
+        return None
+    fixed = _LIST_FIXED_WIDTH_VERBOSE if verbose else _LIST_FIXED_WIDTH
+    return max(10, width - fixed)
+
+
+def _separator_width(verbose: bool) -> int:
+    """Width of the dashed separator under the header."""
+    width = get_terminal_width()
+    if width is not None:
+        return width
+    return 140 if verbose else 120
 
 # ---------------------------------------------------------------------------
 # list
@@ -127,14 +151,14 @@ def list_tasks(
             {"tasks": tasks, "team_id": active_team_id, "timestamp": time.time()}
         )
 
+        name_width = _name_column_width(verbose)
         if verbose:
             click.echo(
                 f"\n{'ID':<12} {'Status':<12} {'Due':<18} {'Assignee':<18} {'Est':<8} {'Tracked':<8} {'Name'}"
             )
-            click.echo("-" * 140)
         else:
             click.echo(f"\n{'ID':<12} {'Status':<12} {'Due':<18} {'Name'}")
-            click.echo("-" * 120)
+        click.echo("-" * _separator_width(verbose))
 
         for task in tasks:
             task_id = task.get("id", "No ID")
@@ -147,7 +171,7 @@ def list_tasks(
                 p_name = parent_cache.get(p_id, p_id)
                 name = f"↳ {name} (sub of {p_name})"
 
-            name = truncate_text(name, 75)
+            name = truncate_text(name, name_width)
 
             if verbose:
                 individuals = [
@@ -270,14 +294,14 @@ def _list_tasks_offline(config, limit, verbose, hide_subtasks):
     if limit:
         tasks = tasks[:limit]
 
+    name_width = _name_column_width(verbose)
     if verbose:
         click.echo(
             f"\n{'ID':<12} {'Status':<12} {'Due':<18} {'Assignee':<18} {'Est':<8} {'Tracked':<8} {'Name'}"
         )
-        click.echo("-" * 140)
     else:
         click.echo(f"\n{'ID':<12} {'Status':<12} {'Due':<18} {'Name'}")
-        click.echo("-" * 120)
+    click.echo("-" * _separator_width(verbose))
 
     for task in tasks:
         task_id = task.get("id", "No ID")
@@ -290,7 +314,7 @@ def _list_tasks_offline(config, limit, verbose, hide_subtasks):
             p_name = parent_cache.get(p_id, p_id)
             name = f"↳ {name} (sub of {p_name})"
 
-        name = truncate_text(name, 75)
+        name = truncate_text(name, name_width)
 
         if verbose:
             individuals = [a.get("username", "?") for a in task.get("assignees", [])]

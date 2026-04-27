@@ -3,6 +3,8 @@ Utility functions for CUPT CLI (basic version)
 """
 
 import re
+import shutil
+import sys
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
@@ -78,15 +80,38 @@ def format_date(timestamp: Optional[Any]) -> str:
         return "Invalid date"
 
 
-def truncate_text(text: str, max_length: int = 50) -> str:
-    """Truncate text to specified length"""
+def truncate_text(text: str, max_length: Optional[int] = 50) -> str:
+    """Truncate text to specified length. None means don't truncate."""
     if not text:
         return ""
 
-    if len(text) <= max_length:
+    if max_length is None or len(text) <= max_length:
         return text
 
+    if max_length <= 3:
+        return text[:max_length]
+
     return text[: max_length - 3] + "..."
+
+
+def get_terminal_width(stream=None) -> Optional[int]:
+    """
+    Return columns available for output, or None if stream is not a TTY.
+
+    A None return means callers should not truncate — output is being captured
+    by another process (pipe, file, subprocess) where line length is irrelevant.
+    For a TTY, respects the COLUMNS environment variable when set, which is the
+    standard mechanism for a parent process to declare a wider "virtual" width.
+    """
+    if stream is None:
+        stream = sys.stdout
+    try:
+        is_tty = stream.isatty()
+    except (AttributeError, ValueError):
+        is_tty = False
+    if not is_tty:
+        return None
+    return shutil.get_terminal_size((80, 24)).columns
 
 
 def print_info(message: str):

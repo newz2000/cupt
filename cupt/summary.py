@@ -6,7 +6,13 @@ import click
 
 from cupt.context import get_client_context
 from cupt.services.task_service import TaskService
-from cupt.utils import format_date, format_duration, print_error, truncate_text
+from cupt.utils import (format_date, format_duration, get_terminal_width,
+                        print_error, truncate_text)
+
+# "  {id:<12} {status:<14} {name}"           -> 2+12+1+14+1 = 30 fixed cols
+# "  {id:<12} {status:<14} {due:<18} {name}" -> 2+12+1+14+1+18+1 = 49 fixed
+_SUMMARY_FIXED_WIDTH = 30
+_SUMMARY_FIXED_WIDTH_WITH_DATE = 49
 
 
 @click.command(name="summary")
@@ -154,7 +160,15 @@ def _print_task_line(task: Dict[str, Any], show_date: bool = False) -> None:
     task_id = task.get("id", "")
     status = task.get("status", {}).get("status", "unknown").upper()
     name = task.get("name", "No name")
-    name = truncate_text(name, 50)
+
+    width = get_terminal_width()
+    if width is None:
+        name_width: Optional[int] = None
+    else:
+        fixed = _SUMMARY_FIXED_WIDTH_WITH_DATE if show_date else _SUMMARY_FIXED_WIDTH
+        name_width = max(10, width - fixed)
+    name = truncate_text(name, name_width)
+
     if show_date:
         due = format_date(task.get("due_date"))
         click.echo(f"  {task_id:<12} {status:<14} {due:<18} {name}")

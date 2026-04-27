@@ -1,7 +1,7 @@
 import pytest
 
 from cupt.utils import (format_date, format_duration, format_task_status,
-                        parse_duration, truncate_text)
+                        get_terminal_width, parse_duration, truncate_text)
 
 
 def test_truncate_text():
@@ -9,6 +9,29 @@ def test_truncate_text():
     assert truncate_text("Short", 10) == "Short"
     assert truncate_text(None, 5) == ""
     assert truncate_text("Exactly5", 8) == "Exactly5"
+
+
+def test_truncate_text_none_means_no_truncation():
+    long = "x" * 500
+    assert truncate_text(long, None) == long
+
+
+class _FakeStream:
+    def __init__(self, tty: bool):
+        self._tty = tty
+
+    def isatty(self) -> bool:
+        return self._tty
+
+
+def test_get_terminal_width_none_when_not_tty():
+    assert get_terminal_width(_FakeStream(False)) is None
+
+
+def test_get_terminal_width_respects_columns_env(monkeypatch):
+    monkeypatch.setenv("COLUMNS", "200")
+    monkeypatch.setenv("LINES", "50")
+    assert get_terminal_width(_FakeStream(True)) == 200
 
 
 def test_parse_duration():
