@@ -417,6 +417,10 @@ def _display_task(task, parent_task, comments, include_notes: bool):
     click.echo(
         f"Priority: {priority.get('priority', 'none').upper() if priority else 'NONE'}"
     )
+    individuals = [a.get("username", "?") for a in task.get("assignees", [])]
+    groups = [g.get("name", "?") for g in task.get("group_assignees", [])]
+    assignees = individuals + groups
+    click.echo(f"Assignee: {', '.join(assignees) if assignees else 'Unassigned'}")
     click.echo(f"Due Date: {format_date(task.get('due_date'))}")
     click.echo(f"Space:    {task.get('space', {}).get('id')}")
     click.echo(

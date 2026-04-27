@@ -203,6 +203,58 @@ def test_show_task_with_parent(runner, mock_config, mock_client):
         assert "Parent Task" in result.output
 
 
+@pytest.mark.parametrize(
+    "task_payload, expected",
+    [
+        # Two individuals
+        (
+            {
+                "assignees": [{"username": "Matt"}, {"username": "Paweena"}],
+                "group_assignees": [],
+            },
+            "Assignee: Matt, Paweena",
+        ),
+        # Single individual
+        (
+            {"assignees": [{"username": "Matt"}], "group_assignees": []},
+            "Assignee: Matt",
+        ),
+        # Team only
+        (
+            {"assignees": [], "group_assignees": [{"name": "Attorneys"}]},
+            "Assignee: Attorneys",
+        ),
+        # Individual + team
+        (
+            {
+                "assignees": [{"username": "Matt"}],
+                "group_assignees": [{"name": "CSMs"}],
+            },
+            "Assignee: Matt, CSMs",
+        ),
+        # No assignees
+        ({"assignees": [], "group_assignees": []}, "Assignee: Unassigned"),
+    ],
+)
+def test_show_task_assignees(runner, mock_config, mock_client, task_payload, expected):
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_task.return_value = {
+            "id": "t1",
+            "name": "Task 1",
+            "status": {"status": "open"},
+            "space": {"id": "s1"},
+            "folder": {"name": "f1"},
+            "list": {"name": "l1"},
+            **task_payload,
+        }
+        mock_client.get_task_comments.return_value = []
+        result = runner.invoke(show_task_cmd, ["t1"])
+        assert result.exit_code == 0
+        assert expected in result.output
+
+
 def test_show_task_with_notes(runner, mock_config, mock_client):
     with patch(
         "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
