@@ -64,12 +64,19 @@ class TaskService:
         include_closed: bool = False,
         mine: bool = True,
         max_pages: int = 15,
+        tags: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """Fetch and filter tasks from the API with pagination."""
         filters = self.get_filters(overdue, today, week)
 
         if mine and user_id:
             filters["assignees[]"] = [user_id]
+
+        # ClickUp's tags[] is OR semantics — server returns tasks bearing ANY
+        # of these tags. The caller's --tag AND requirement is then applied
+        # client-side over this narrower candidate set.
+        if tags:
+            filters["tags[]"] = list(tags)
 
         all_tasks: List[Dict[str, Any]] = []
         page = 0
@@ -107,6 +114,38 @@ class TaskService:
             )
         )
         return all_tasks
+
+    @staticmethod
+    def filter_by_tags(
+        tasks: List[Dict[str, Any]],
+        required: Optional[List[str]] = None,
+        excluded: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Filter tasks by tag (case-insensitive).
+
+        - `required`: AND — task must bear every name in this list.
+        - `excluded`: OR  — task is dropped if it bears any name in this list.
+
+        Pure function; no I/O.
+        """
+        if not required and not excluded:
+            return tasks
+        req = {t.lower() for t in (required or [])}
+        exc = {t.lower() for t in (excluded or [])}
+
+        def names(task: Dict[str, Any]) -> set:
+            return {(t.get("name") or "").lower() for t in (task.get("tags") or [])}
+
+        def keep(task: Dict[str, Any]) -> bool:
+            n = names(task)
+            if req and not req.issubset(n):
+                return False
+            if exc and n & exc:
+                return False
+            return True
+
+        return [t for t in tasks if keep(t)]
 
     def resolve_parent_names(
         self, team_id: str, tasks: List[Dict[str, Any]], parent_cache: Dict[str, str]

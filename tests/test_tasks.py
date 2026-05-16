@@ -177,6 +177,62 @@ def test_list_tasks_filter_by_no_tag(runner, mock_config, mock_client):
         assert "Has Waiting" not in result.output
 
 
+def test_list_tasks_sends_tags_to_api(runner, mock_config, mock_client):
+    """--tag is pushed to the ClickUp API as tags[] (server-side filtering)."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_team_tasks.return_value = [
+            {
+                "id": "t1",
+                "name": "Task 1",
+                "status": {"status": "open", "type": "open"},
+                "tags": [{"name": "urgent"}],
+            },
+        ]
+        result = runner.invoke(list_tasks_cmd, ["--tag", "urgent"])
+        assert result.exit_code == 0
+        filters = mock_client.get_team_tasks.call_args[0][1]
+        assert filters["tags[]"] == ["urgent"]
+
+
+def test_list_tasks_stacked_tags_or_then_and(runner, mock_config, mock_client):
+    """API returns OR'd candidates; client narrows to AND of required tags."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        # Server returns the OR'd candidate set (a OR b).
+        mock_client.get_team_tasks.return_value = [
+            {
+                "id": "t1",
+                "name": "Just A",
+                "status": {"status": "open", "type": "open"},
+                "tags": [{"name": "a"}],
+            },
+            {
+                "id": "t2",
+                "name": "A and B",
+                "status": {"status": "open", "type": "open"},
+                "tags": [{"name": "a"}, {"name": "b"}],
+            },
+            {
+                "id": "t3",
+                "name": "Just B",
+                "status": {"status": "open", "type": "open"},
+                "tags": [{"name": "b"}],
+            },
+        ]
+        result = runner.invoke(list_tasks_cmd, ["--tag", "a", "--tag", "b"])
+        assert result.exit_code == 0
+        # API got both tags (OR semantics).
+        filters = mock_client.get_team_tasks.call_args[0][1]
+        assert set(filters["tags[]"]) == {"a", "b"}
+        # Client narrowed to the AND set.
+        assert "A and B" in result.output
+        assert "Just A" not in result.output
+        assert "Just B" not in result.output
+
+
 def test_list_tasks_tag_filters_stack(runner, mock_config, mock_client):
     """--tag A --tag B requires both; --no-tag C still excludes."""
     with patch(

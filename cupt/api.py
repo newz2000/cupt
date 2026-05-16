@@ -25,19 +25,19 @@ class ClickUpClient:
     def __init__(self, access_token: str):
         self.access_token = access_token
         self.session = requests.Session()
-        self.session.headers.update(
-            {
-                "Authorization": self.access_token,
-                "Content-Type": "application/json",
-            }
-        )
+        # Only Authorization on the session. Content-Type is set per-request
+        # inside _make_request so it never leaks into multipart uploads
+        # (which generate their own Content-Type with a boundary).
+        self.session.headers.update({"Authorization": self.access_token})
 
         # Retry transient server errors with exponential backoff.
-        # Retries: 500/502/503/504 only — not 4xx client errors.
+        # 429 included so ClickUp rate limits trigger backoff (urllib3's
+        # Retry honors the Retry-After header automatically).
         _retry = Retry(
-            total=2,
-            backoff_factor=0.3,
-            status_forcelist=[500, 502, 503, 504],
+            total=3,
+            backoff_factor=0.5,
+            status_forcelist=[429, 500, 502, 503, 504],
+            respect_retry_after_header=True,
             raise_on_status=False,
         )
         # Pool keeps persistent TCP connections open across requests in the
@@ -57,13 +57,19 @@ class ClickUpClient:
         url = f"{self.BASE_URL}/{endpoint.lstrip('/')}"
         logger.debug("%s %s params=%s", method.upper(), url, params)
 
+        # Per-request JSON header only on methods that carry a JSON body.
+        json_headers = {"Content-Type": "application/json"}
         try:
             if method.upper() == "GET":
                 response = self.session.get(url, params=params, timeout=self.TIMEOUT)
             elif method.upper() == "POST":
-                response = self.session.post(url, json=data, timeout=self.TIMEOUT)
+                response = self.session.post(
+                    url, json=data, headers=json_headers, timeout=self.TIMEOUT
+                )
             elif method.upper() == "PUT":
-                response = self.session.put(url, json=data, timeout=self.TIMEOUT)
+                response = self.session.put(
+                    url, json=data, headers=json_headers, timeout=self.TIMEOUT
+                )
             elif method.upper() == "DELETE":
                 response = self.session.delete(url, timeout=self.TIMEOUT)
             else:

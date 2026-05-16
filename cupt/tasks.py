@@ -115,27 +115,11 @@ def list_tasks_cmd(
     )
 
 
-def _task_tag_names(task):
-    """Lowercased set of tag names on a task."""
-    return {(t.get("name") or "").lower() for t in (task.get("tags") or [])}
-
-
 def _filter_by_tags(tasks, tags, no_tags):
-    """Apply --tag (AND) and --no-tag (exclude any) filters."""
-    if not tags and not no_tags:
-        return tasks
-    required = {t.lower() for t in tags}
-    excluded = {t.lower() for t in no_tags}
-
-    def keep(task):
-        names = _task_tag_names(task)
-        if required and not required.issubset(names):
-            return False
-        if excluded and names & excluded:
-            return False
-        return True
-
-    return [t for t in tasks if keep(t)]
+    """CLI shim — real implementation lives on TaskService."""
+    return TaskService.filter_by_tags(
+        tasks, required=list(tags) or None, excluded=list(no_tags) or None
+    )
 
 
 def list_tasks(
@@ -180,6 +164,7 @@ def list_tasks(
             week=week,
             include_closed=include_closed,
             mine=mine,
+            tags=list(tags) if tags else None,
         )
 
         if not tasks:

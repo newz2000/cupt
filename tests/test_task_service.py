@@ -37,6 +37,25 @@ def test_list_tasks_filtering(service, mock_client):
     assert len(tasks) == 2
 
 
+def test_list_tasks_passes_tags_to_api(service, mock_client):
+    """tags= argument is forwarded as ClickUp's tags[] filter (server-side OR)."""
+    mock_client.get_team_tasks.return_value = []
+    service.list_tasks("team1", tags=["urgent", "billing"])
+    _, kwargs = mock_client.get_team_tasks.call_args
+    # filters arg is positional second
+    call_args = mock_client.get_team_tasks.call_args[0]
+    filters = call_args[1]
+    assert filters["tags[]"] == ["urgent", "billing"]
+
+
+def test_list_tasks_omits_tags_when_empty(service, mock_client):
+    """No tags arg → no tags[] in the filter payload."""
+    mock_client.get_team_tasks.return_value = []
+    service.list_tasks("team1")
+    filters = mock_client.get_team_tasks.call_args[0][1]
+    assert "tags[]" not in filters
+
+
 def test_resolve_parent_names(service, mock_client):
     tasks = [{"id": "s1", "parent": "p1"}]
     mock_client.get_tasks_by_ids.return_value = [{"id": "p1", "name": "Parent Name"}]

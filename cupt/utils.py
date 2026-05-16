@@ -1,5 +1,8 @@
 """
-Utility functions for CUPT CLI (basic version)
+Internal formatting + I/O helpers for the CLI.
+
+Not part of the public library API — these may change between releases.
+Library users should not import from this module.
 """
 
 import re
@@ -114,24 +117,38 @@ def get_terminal_width(stream=None) -> Optional[int]:
     return shutil.get_terminal_size((80, 24)).columns
 
 
+def _decorate(prefix_tty: str, prefix_plain: str, message: str) -> str:
+    """Prefix with an emoji on TTY, with plain text when piped/captured."""
+    try:
+        if sys.stderr.isatty():
+            return f"{prefix_tty}  {message}"
+    except (AttributeError, ValueError):
+        pass
+    return f"{prefix_plain}: {message}"
+
+
 def print_info(message: str):
-    """Print info message"""
-    print(f"ℹ️  {message}")
+    """Print info message to stderr."""
+    print(_decorate("ℹ️", "INFO", message), file=sys.stderr)
 
 
 def print_error(message: str):
-    """Print error message"""
-    print(f"❌ {message}")
+    """Print error message to stderr."""
+    print(_decorate("❌", "ERROR", message), file=sys.stderr)
 
 
 def print_success(message: str):
-    """Print success message"""
-    print(f"✅ {message}")
+    """Print success message to stderr.
+
+    Success messages are not data — they shouldn't pollute stdout when the
+    user pipes a command (e.g. `cupt list --json | jq ...`).
+    """
+    print(_decorate("✅", "OK", message), file=sys.stderr)
 
 
 def print_warning(message: str):
-    """Print warning message"""
-    print(f"⚠️  {message}")
+    """Print warning message to stderr."""
+    print(_decorate("⚠️", "WARN", message), file=sys.stderr)
 
 
 def format_task_status(status: str) -> str:

@@ -6,14 +6,27 @@ import pytest
 from cupt.config import ConfigManager
 
 
-def test_config_initialization(tmp_path):
+def test_config_lazy_initialization(tmp_path):
+    """Constructing a ConfigManager must not touch disk — library users
+    importing cupt shouldn't get a config dir carved into their home."""
     config_file = tmp_path / "config.yaml"
     manager = ConfigManager(config_file)
 
+    assert not config_file.exists()
+    # Reads of a missing config return empty defaults, no file gets created.
+    assert manager.load_config() == {}
+    assert not config_file.exists()
+
+
+def test_config_created_on_first_write(tmp_path):
+    """First write materializes the directory and persists the value."""
+    config_file = tmp_path / "config.yaml"
+    manager = ConfigManager(config_file)
+    manager.set("user.team_id", "abc")
+
     assert config_file.exists()
     config = manager.load_config()
-    assert "auth" in config
-    assert "user" in config
+    assert config["user"]["team_id"] == "abc"
 
 
 def test_config_set_get(tmp_path):
@@ -55,10 +68,23 @@ def test_load_task_detail_missing(tmp_path):
     assert manager.load_task_detail("nonexistent") is None
 
 
-def test_task_cache_dir_created(tmp_path):
+def test_task_cache_dir_created_lazily(tmp_path):
+    """Cache dir is only created when the first write happens, not on init."""
     manager = ConfigManager(tmp_path / "config.yaml")
-    assert manager.task_cache_dir.exists()
+    assert not manager.task_cache_dir.exists()
+    manager.save_task_detail("t1", {"task": {}, "cached_at": 1.0})
     assert manager.task_cache_dir.is_dir()
+
+
+def test_top_level_library_imports():
+    """`from cupt import ...` must expose the documented public API."""
+    from cupt import (APIError, AuthError, ClickUpClient, ConfigError,
+                      CuptError, NoteService, TaskService, TimeService)
+
+    # Spot-check: instantiating the client does no I/O and needs only a token.
+    client = ClickUpClient("pk_fake")
+    assert hasattr(client, "get_task")
+    assert TaskService(client).client is client
 
 
 def test_clear_cache_removes_task_details(tmp_path):

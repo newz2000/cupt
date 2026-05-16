@@ -244,3 +244,28 @@ def test_upload_task_attachment_uses_filename_override(client, tmp_path):
         _, kwargs = mock_post.call_args
         sent_name, _ = kwargs["files"]["attachment"]
         assert sent_name == "renamed.bin"
+
+
+def test_session_has_no_global_content_type():
+    """
+    Regression: Content-Type must NOT live on the session. It belongs
+    on individual JSON requests inside _make_request — leaving it on the
+    session corrupts multipart uploads (see test_upload_task_attachment_no_json_content_type).
+
+    Uses a real ClickUpClient (no session mocking) so we inspect the
+    actual session.headers populated by __init__.
+    """
+    real_client = ClickUpClient("test_token")
+    # requests uses a CaseInsensitiveDict — both spellings would match.
+    assert "Content-Type" not in real_client.session.headers
+    assert "content-type" not in real_client.session.headers
+    assert real_client.session.headers["Authorization"] == "test_token"
+
+
+def test_post_request_carries_json_content_type(client, mock_session):
+    """POST/PUT requests still get Content-Type: application/json per-request."""
+    mock_session.post.return_value.json.return_value = {"ok": True}
+    mock_session.post.return_value.status_code = 200
+    client.add_task_comment("t1", "hi")
+    _, kwargs = mock_session.post.call_args
+    assert kwargs["headers"] == {"Content-Type": "application/json"}

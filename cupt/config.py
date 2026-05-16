@@ -3,11 +3,14 @@ Configuration management for CUPT CLI
 """
 
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 import yaml
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigManager:
@@ -27,45 +30,28 @@ class ConfigManager:
 
         self.task_cache_dir = self.config_dir / "task_cache"
 
+    def _ensure_dirs(self):
+        """Create config + cache dirs on demand. Idempotent."""
         self.config_dir.mkdir(exist_ok=True, parents=True)
         self.task_cache_dir.mkdir(exist_ok=True)
-
-        if not self.config_file.exists():
-            self._create_default_config()
-
-    def _create_default_config(self):
-        """Create default configuration file"""
-        default_config = {
-            "auth": {
-                "access_token": None,
-                "refresh_token": None,
-                "expires_at": None,
-                "client_id": None,
-                "client_secret": None,
-            },
-            "user": {
-                "team_id": None,
-                "user_id": None,
-                "default_list_id": None,
-            },
-            "cache": {
-                "last_sync": None,
-                "tasks_ttl": 300,
-            },
-        }
-        with open(self.config_file, "w") as f:
-            yaml.dump(default_config, f, default_flow_style=False)
-        os.chmod(self.config_file, 0o600)
 
     def load_config(self) -> Dict[str, Any]:
         """Load configuration, using in-memory cache to avoid repeated disk reads."""
         if self._config is None:
+            if not self.config_file.exists():
+                # No config on disk yet — return empty mapping rather than
+                # creating one. Library users importing the package shouldn't
+                # get a config dir carved into their home unless they actually
+                # write something.
+                self._config = {}
+                return self._config
             with open(self.config_file, "r") as f:
                 self._config = yaml.safe_load(f) or {}
         return self._config
 
     def save_config(self, config: Dict[str, Any]):
         """Persist configuration and refresh the in-memory cache."""
+        self._ensure_dirs()
         self._config = config
         with open(self.config_file, "w") as f:
             yaml.dump(config, f, default_flow_style=False)
@@ -110,6 +96,7 @@ class ConfigManager:
 
     def save_cache(self, cache_data: Dict[str, Any]):
         """Persist parent-name cache to JSON file."""
+        self._ensure_dirs()
         with open(self.cache_file, "w") as f:
             json.dump(cache_data, f)
         os.chmod(self.cache_file, 0o600)
@@ -126,21 +113,23 @@ class ConfigManager:
     def save_task_cache(self, data: Dict[str, Any]) -> None:
         """Persist task list cache to disk (used for --offline mode)."""
         try:
+            self._ensure_dirs()
             with open(self.task_cache_file, "w") as f:
                 json.dump(data, f)
             os.chmod(self.task_cache_file, 0o600)
-        except Exception:
-            pass  # cache write failure is non-fatal
+        except Exception as e:
+            logger.warning("Failed to write task list cache: %s", e)
 
     def save_task_detail(self, task_id: str, data: Dict[str, Any]) -> None:
         """Persist full task detail (task, parent, comments) to a per-task JSON file."""
         try:
+            self._ensure_dirs()
             path = self.task_cache_dir / f"{task_id}.json"
             with open(path, "w") as f:
                 json.dump(data, f)
             os.chmod(path, 0o600)
-        except Exception:
-            pass  # cache write failure is non-fatal
+        except Exception as e:
+            logger.warning("Failed to write task detail cache for %s: %s", task_id, e)
 
     def load_task_detail(self, task_id: str) -> Optional[Dict[str, Any]]:
         """Load cached task detail. Returns None if missing or unreadable."""
