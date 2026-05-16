@@ -13,20 +13,25 @@ CUPT stands for “ClickUP Terminal,” a command-line interface for accessing y
 
 ## Installation
 
-### Recommended: System-wide using `pipx`
-Use `pipx` to install `cupt` in an isolated environment that is globally available:
+### Recommended: from PyPI using `pipx`
+
+`pipx` installs `cupt` in an isolated environment that's available
+globally on your system — same convenience as a system package, no
+chance of conflicting with whatever Python projects you happen to be
+working on.
 
 ```bash
-# From the project root
-pipx install .
-
-# To update an existing installation after code changes:
-pipx install --force .
+pipx install cupt
+pipx upgrade cupt        # later, when a new version is published
 ```
 
-If you don't have `pipx`, install it via Homebrew: `brew install pipx && pipx ensurepath`.
+If you don't have `pipx`, install it via Homebrew (`brew install pipx
+&& pipx ensurepath`) or follow <https://pipx.pypa.io/stable/installation/>.
 
-### Development: Local Editable Install
+Plain `pip install cupt` works too; `pipx` is just the friendlier
+default for CLI tools.
+
+### Development: Install From Source
 If you are developing or want an isolated virtual environment:
 ```bash
 git clone https://github.com/newz2000/cupt.git
@@ -34,6 +39,11 @@ cd cupt
 python -m venv venv
 source venv/bin/activate
 pip install -e .
+```
+
+To try your local checkout system-wide (overrides any PyPI install):
+```bash
+pipx install --force .
 ```
 
 ### Configuration
