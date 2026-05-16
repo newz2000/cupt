@@ -102,6 +102,6 @@ Feel free to pick or reorder sections as per your workflow.
 ---
  Next Steps to Begin
 1. **Create test skeletons** (e.g., `tests/test_api_client.py`).
-2. **Set up a local virtualenv** with dependencies from `requirements.txt`.
+2. **Set up a local virtualenv** with `pip install -e .` (deps declared in `pyproject.toml`).
 3. **Run `pytest --cov`** to get baseline coverage.
 4. **Iteratively add mocks and assertions** as outlined.
