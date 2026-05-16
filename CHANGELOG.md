@@ -12,6 +12,13 @@ user impact are not listed.
 
 (nothing yet)
 
+## [0.6.2] — 2026-05-16
+
+No functional or library changes. First release published automatically
+via GitHub Actions Trusted Publishing (OIDC) — verifies the pipeline
+introduced in commit `ceaab8a` works end to end. Future releases now
+happen by tagging `v*` on `main`.
+
 ## [0.6.1] — 2026-05-16
 
 Library-readiness pass. No CLI behavior changes; the public API surface

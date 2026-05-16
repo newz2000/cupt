@@ -22,7 +22,7 @@ from cupt.services.note_service import NoteService
 from cupt.services.task_service import TaskService
 from cupt.services.time_service import TimeService
 
-__version__ = "0.6.1"
+__version__ = "0.6.2"
 __author__ = "Matthew Nuzum"
 __email__ = "matthew@nuzum.com"
 
