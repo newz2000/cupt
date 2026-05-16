@@ -21,7 +21,7 @@ setup(
     description="ClickUp Task Management CLI",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/matthewnuzum/cupt",
+    url="https://github.com/newz2000/cupt",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 3 - Alpha",

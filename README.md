@@ -28,7 +28,7 @@ If you don't have `pipx`, install it via Homebrew: `brew install pipx && pipx en
 ### Development: Local Editable Install
 If you are developing or want an isolated virtual environment:
 ```bash
-git clone https://github.com/matthewnuzum/cupt.git
+git clone https://github.com/newz2000/cupt.git
 cd cupt
 python -m venv venv
 source venv/bin/activate
