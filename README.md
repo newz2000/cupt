@@ -1,6 +1,6 @@
 # CUPT - ClickUp Task Management CLI
 
-A powerful, modular CLI tool for managing ClickUp tasks directly from your terminal.
+CUPT stands for “ClickUP Terminal,” a command-line interface for accessing your tasks in ClickUp in the terminal or via your favorite AI-based tool.
 
 ## Features
 - **Task Listing**: View active, overdue, and upcoming tasks with deep paging support.
@@ -9,11 +9,12 @@ A powerful, modular CLI tool for managing ClickUp tasks directly from your termi
 - **Time Tracking**: Start/stop timers and add manual time entries.
 - **Note Management**: Quick comments and note listing.
 - **Flexible Auth**: Supports both OAuth and Personal API Tokens.
+- **Offline Support**: After `cupt list` runs, it transparently caches the full details (description, comments, parent) for every task it just displayed, so a later `cupt show <id> --offline` works without a network. Run `cupt prefetch` to populate the same cache eagerly when you know you'll be offline soon.
 
 ## Installation
 
 ### Recommended: System-wide using `pipx`
-MacOS (Homebrew) prevents installing packages directly into the system Python. Use `pipx` to install `cupt` in an isolated environment that is globally available:
+Use `pipx` to install `cupt` in an isolated environment that is globally available:
 
 ```bash
 # From the project root
@@ -99,8 +100,8 @@ internal to the CLI and may change between releases.
 
 ## Testing
 `cupt` is built with a strong focus on stability and testability.
-- **Coverage**: 75% total coverage
-- **Tests**: 47 unit tests using `pytest` and mocks.
+- **Coverage**: 83% total coverage
+- **Tests**: 186 unit tests using `pytest` and mocks.
 
 Run the test suite:
 ```bash
@@ -120,3 +121,6 @@ Exciting features planned for upcoming releases:
 - `cupt/api.py`: ClickUp API client wrapper.
 - `cupt/main.py`: CLI entry point.
 - `tests/`: Comprehensive unit tests.
+
+## Contributions
+If you or your favorite AI tool want to make improvements, please submit a pull request. Please respect the requirements in the AGENTS.md file and run the pre-commit hook to verify compliance with the coding standards. 
