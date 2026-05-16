@@ -1,3 +1,4 @@
+import json
 import time
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
@@ -60,6 +61,24 @@ def _separator_width(verbose: bool) -> int:
     is_flag=True,
     help="Use locally cached task list (no network required)",
 )
+@click.option(
+    "--tag",
+    "tags",
+    multiple=True,
+    help="Only tasks with this tag (repeatable; tasks must have ALL tags given)",
+)
+@click.option(
+    "--no-tag",
+    "no_tags",
+    multiple=True,
+    help="Exclude tasks with this tag (repeatable)",
+)
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Output raw task data as JSON (pipeable, no headers or background caching)",
+)
 def list_tasks_cmd(
     overdue,
     today,
@@ -72,6 +91,9 @@ def list_tasks_cmd(
     show_all=False,
     hide_subtasks=False,
     offline=False,
+    tags=(),
+    no_tags=(),
+    as_json=False,
 ):
     """List tasks with optional filters"""
     if show_all:
@@ -87,7 +109,33 @@ def list_tasks_cmd(
         mine,
         hide_subtasks,
         offline,
+        tags,
+        no_tags,
+        as_json,
     )
+
+
+def _task_tag_names(task):
+    """Lowercased set of tag names on a task."""
+    return {(t.get("name") or "").lower() for t in (task.get("tags") or [])}
+
+
+def _filter_by_tags(tasks, tags, no_tags):
+    """Apply --tag (AND) and --no-tag (exclude any) filters."""
+    if not tags and not no_tags:
+        return tasks
+    required = {t.lower() for t in tags}
+    excluded = {t.lower() for t in no_tags}
+
+    def keep(task):
+        names = _task_tag_names(task)
+        if required and not required.issubset(names):
+            return False
+        if excluded and names & excluded:
+            return False
+        return True
+
+    return [t for t in tasks if keep(t)]
 
 
 def list_tasks(
@@ -101,6 +149,9 @@ def list_tasks(
     mine=True,
     hide_subtasks=False,
     offline=False,
+    tags=(),
+    no_tags=(),
+    as_json=False,
 ):
     """List and display tasks."""
     config, client, config_team_id = get_client_context(need_team=False)
@@ -116,7 +167,9 @@ def list_tasks(
 
     try:
         if offline:
-            return _list_tasks_offline(config, limit, verbose, hide_subtasks)
+            return _list_tasks_offline(
+                config, limit, verbose, hide_subtasks, tags, no_tags, as_json
+            )
 
         service = TaskService(client)
         tasks = service.list_tasks(
@@ -130,14 +183,30 @@ def list_tasks(
         )
 
         if not tasks:
-            print_warning("No active tasks found matching criteria.")
+            if as_json:
+                click.echo("[]")
+            else:
+                print_warning("No active tasks found matching criteria.")
             return []
 
         if hide_subtasks:
             tasks = [t for t in tasks if not t.get("parent")]
 
+        tasks = _filter_by_tags(tasks, tags, no_tags)
+
+        if not tasks:
+            if as_json:
+                click.echo("[]")
+            else:
+                print_warning("No tasks matched the tag filter.")
+            return []
+
         if limit:
             tasks = tasks[:limit]
+
+        if as_json:
+            click.echo(json.dumps(tasks, indent=2))
+            return tasks
 
         # Resolve parent names for subtasks (persistent cache).
         parent_cache = config.load_cache()
@@ -269,30 +338,56 @@ def _background_cache_tasks(client, config, tasks, timeout: float = 2.0) -> int:
     return cached_count
 
 
-def _list_tasks_offline(config, limit, verbose, hide_subtasks):
+def _list_tasks_offline(
+    config, limit, verbose, hide_subtasks, tags=(), no_tags=(), as_json=False
+):
     """Display tasks from local cache without any API calls."""
     cached = config.load_task_cache()
     if not cached:
-        print_error("No cached data available. Run 'cupt list' while online first.")
+        if as_json:
+            click.echo("[]")
+        else:
+            print_error(
+                "No cached data available. Run 'cupt list' while online first."
+            )
         return []
 
-    age_minutes = (time.time() - cached.get("timestamp", 0)) / 60
-    if age_minutes > 60:
-        print_warning(f"Offline cache is {int(age_minutes)} minutes old.")
-    else:
-        print_warning(f"Offline mode — showing data cached {int(age_minutes)}m ago.")
+    if not as_json:
+        age_minutes = (time.time() - cached.get("timestamp", 0)) / 60
+        if age_minutes > 60:
+            print_warning(f"Offline cache is {int(age_minutes)} minutes old.")
+        else:
+            print_warning(
+                f"Offline mode — showing data cached {int(age_minutes)}m ago."
+            )
 
     tasks = cached.get("tasks", [])
     parent_cache = config.load_cache()
 
     if not tasks:
-        print_warning("No tasks in cache.")
+        if as_json:
+            click.echo("[]")
+        else:
+            print_warning("No tasks in cache.")
         return []
 
     if hide_subtasks:
         tasks = [t for t in tasks if not t.get("parent")]
+
+    tasks = _filter_by_tags(tasks, tags, no_tags)
+    if not tasks:
+        if as_json:
+            click.echo("[]")
+        else:
+            print_warning("No tasks matched the tag filter.")
+        return []
+
     if limit:
         tasks = tasks[:limit]
+
+    if as_json:
+        click.echo(json.dumps(tasks, indent=2))
+        return tasks
 
     name_width = _name_column_width(verbose)
     if verbose:
@@ -352,25 +447,39 @@ def _list_tasks_offline(config, limit, verbose, hide_subtasks):
     is_flag=True,
     help="Use cached data (no network required)",
 )
-def show_task_cmd(task_id, notes, offline):
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Output raw task data as JSON (always includes parent + comments)",
+)
+def show_task_cmd(task_id, notes, offline, as_json):
     """Show detailed task information"""
-    return show_task(task_id, notes, offline)
+    return show_task(task_id, notes, offline, as_json)
 
 
-def show_task(task_id: str, include_notes: bool = False, offline: bool = False):
+def show_task(
+    task_id: str,
+    include_notes: bool = False,
+    offline: bool = False,
+    as_json: bool = False,
+):
     """Display full details for a single task."""
     config, client, _ = get_client_context(need_team=False)
     if not client:
         return
 
     if offline:
-        return _show_task_offline(config, task_id, include_notes)
+        return _show_task_offline(config, task_id, include_notes, as_json)
 
     try:
         task = client.get_task(task_id)
 
         if not task:
-            print_error(f"Task {task_id} not found")
+            if as_json:
+                click.echo("null")
+            else:
+                print_error(f"Task {task_id} not found")
             return
 
         p_id = task.get("parent")
@@ -401,6 +510,15 @@ def show_task(task_id: str, include_notes: bool = False, offline: bool = False):
             },
         )
 
+        if as_json:
+            click.echo(
+                json.dumps(
+                    {"task": task, "parent": parent_task, "comments": comments},
+                    indent=2,
+                )
+            )
+            return
+
         _display_task(task, parent_task, comments, include_notes)
 
     except Exception as e:
@@ -422,6 +540,9 @@ def _display_task(task, parent_task, comments, include_notes: bool):
     assignees = individuals + groups
     click.echo(f"Assignee: {', '.join(assignees) if assignees else 'Unassigned'}")
     click.echo(f"Due Date: {format_date(task.get('due_date'))}")
+    tag_names = [t.get("name", "") for t in (task.get("tags") or []) if t.get("name")]
+    if tag_names:
+        click.echo(f"Tags:     {', '.join(tag_names)}")
     click.echo(f"Space:    {task.get('space', {}).get('id')}")
     click.echo(
         f"Folder:   {task.get('folder', {}).get('name', 'N/A')} ({task.get('folder', {}).get('id', 'N/A')})"
@@ -455,11 +576,25 @@ def _display_task(task, parent_task, comments, include_notes: bool):
             click.echo(f"[{date}] {author}: {text}")
 
 
-def _show_task_offline(config, task_id: str, include_notes: bool):
+def _show_task_offline(
+    config, task_id: str, include_notes: bool, as_json: bool = False
+):
     """Display task from local cache without any API calls."""
     cached = config.load_task_detail(task_id)
 
     if cached:
+        if as_json:
+            click.echo(
+                json.dumps(
+                    {
+                        "task": cached["task"],
+                        "parent": cached.get("parent"),
+                        "comments": cached.get("comments", []),
+                    },
+                    indent=2,
+                )
+            )
+            return
         age_minutes = (time.time() - cached.get("cached_at", 0)) / 60
         print_warning(f"Offline mode — data cached {int(age_minutes)}m ago.")
         _display_task(
@@ -477,6 +612,13 @@ def _show_task_offline(config, task_id: str, include_notes: bool):
             (t for t in list_cached.get("tasks", []) if t["id"] == task_id), None
         )
         if task:
+            if as_json:
+                click.echo(
+                    json.dumps(
+                        {"task": task, "parent": None, "comments": []}, indent=2
+                    )
+                )
+                return
             age_minutes = (time.time() - list_cached.get("timestamp", 0)) / 60
             print_warning(
                 f"Partial offline data (list cache, {int(age_minutes)}m old). "
@@ -485,6 +627,9 @@ def _show_task_offline(config, task_id: str, include_notes: bool):
             _display_task(task, None, [], include_notes)
             return
 
+    if as_json:
+        click.echo("null")
+        return
     print_error(
         f"Task {task_id} not in offline cache. "
         "Run 'cupt prefetch' or 'cupt show <id>' online first."

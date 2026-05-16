@@ -1,3 +1,4 @@
+import json
 import time
 from unittest.mock import ANY, MagicMock, call, patch
 
@@ -124,6 +125,174 @@ def test_list_tasks_triggers_background_cache(runner, mock_config, mock_client):
         assert result.exit_code == 0
         assert "Task 1" in result.output
         mock_config.save_task_detail.assert_called_once_with("t1", ANY)
+
+
+def test_list_tasks_filter_by_tag(runner, mock_config, mock_client):
+    """--tag X keeps only tasks bearing tag X (case-insensitive)."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_team_tasks.return_value = [
+            {
+                "id": "t1",
+                "name": "Has Urgent",
+                "status": {"status": "open", "type": "open"},
+                "tags": [{"name": "Urgent"}],
+            },
+            {
+                "id": "t2",
+                "name": "No Tags",
+                "status": {"status": "open", "type": "open"},
+                "tags": [],
+            },
+        ]
+        result = runner.invoke(list_tasks_cmd, ["--tag", "urgent"])
+        assert result.exit_code == 0
+        assert "Has Urgent" in result.output
+        assert "No Tags" not in result.output
+
+
+def test_list_tasks_filter_by_no_tag(runner, mock_config, mock_client):
+    """--no-tag X drops any task bearing tag X."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_team_tasks.return_value = [
+            {
+                "id": "t1",
+                "name": "Has Waiting",
+                "status": {"status": "open", "type": "open"},
+                "tags": [{"name": "waiting"}],
+            },
+            {
+                "id": "t2",
+                "name": "Clean Task",
+                "status": {"status": "open", "type": "open"},
+                "tags": [{"name": "other"}],
+            },
+        ]
+        result = runner.invoke(list_tasks_cmd, ["--no-tag", "waiting"])
+        assert result.exit_code == 0
+        assert "Clean Task" in result.output
+        assert "Has Waiting" not in result.output
+
+
+def test_list_tasks_tag_filters_stack(runner, mock_config, mock_client):
+    """--tag A --tag B requires both; --no-tag C still excludes."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_team_tasks.return_value = [
+            {
+                "id": "t1",
+                "name": "A only",
+                "status": {"status": "open", "type": "open"},
+                "tags": [{"name": "a"}],
+            },
+            {
+                "id": "t2",
+                "name": "A and B",
+                "status": {"status": "open", "type": "open"},
+                "tags": [{"name": "a"}, {"name": "b"}],
+            },
+            {
+                "id": "t3",
+                "name": "A B C",
+                "status": {"status": "open", "type": "open"},
+                "tags": [{"name": "a"}, {"name": "b"}, {"name": "c"}],
+            },
+        ]
+        result = runner.invoke(
+            list_tasks_cmd, ["--tag", "a", "--tag", "b", "--no-tag", "c"]
+        )
+        assert result.exit_code == 0
+        assert "A and B" in result.output
+        assert "A only" not in result.output
+        assert "A B C" not in result.output
+
+
+def test_list_tasks_tag_filter_no_matches(runner, mock_config, mock_client):
+    """A tag filter that matches nothing reports a friendly message."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_team_tasks.return_value = [
+            {
+                "id": "t1",
+                "name": "Task 1",
+                "status": {"status": "open", "type": "open"},
+                "tags": [{"name": "alpha"}],
+            },
+        ]
+        result = runner.invoke(list_tasks_cmd, ["--tag", "missing"])
+        assert result.exit_code == 0
+        assert "No tasks matched the tag filter" in result.output
+
+
+def test_list_tasks_json_output(runner, mock_config, mock_client):
+    """--json emits a parseable JSON array and suppresses headers + warnings."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_team_tasks.return_value = [
+            {
+                "id": "t1",
+                "name": "Task 1",
+                "status": {"status": "open", "type": "open"},
+                "tags": [{"name": "urgent"}],
+            },
+            {
+                "id": "t2",
+                "name": "Task 2",
+                "status": {"status": "open", "type": "open"},
+                "tags": [],
+            },
+        ]
+        result = runner.invoke(list_tasks_cmd, ["--json"])
+        assert result.exit_code == 0
+        # Output must be pure JSON — no decorative headers.
+        assert "ID" not in result.output.splitlines()[0]
+        payload = json.loads(result.output)
+        assert isinstance(payload, list)
+        assert {t["id"] for t in payload} == {"t1", "t2"}
+        # Background caching should NOT run in json mode.
+        mock_config.save_task_detail.assert_not_called()
+
+
+def test_list_tasks_json_respects_tag_filter(runner, mock_config, mock_client):
+    """--json + --tag should narrow the JSON payload to matching tasks."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_team_tasks.return_value = [
+            {
+                "id": "t1",
+                "name": "Tagged",
+                "status": {"status": "open", "type": "open"},
+                "tags": [{"name": "urgent"}],
+            },
+            {
+                "id": "t2",
+                "name": "Untagged",
+                "status": {"status": "open", "type": "open"},
+                "tags": [],
+            },
+        ]
+        result = runner.invoke(list_tasks_cmd, ["--json", "--tag", "urgent"])
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert [t["id"] for t in payload] == ["t1"]
+
+
+def test_list_tasks_json_empty(runner, mock_config, mock_client):
+    """--json with no matching tasks emits `[]`, not a warning string."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_team_tasks.return_value = []
+        result = runner.invoke(list_tasks_cmd, ["--json"])
+        assert result.exit_code == 0
+        assert json.loads(result.output) == []
 
 
 def test_list_tasks_exception(runner, mock_config, mock_client):
@@ -494,6 +663,80 @@ def test_show_task_saves_detail_cache(runner, mock_config, mock_client):
         assert saved_id == "t1"
         assert saved_data["task"]["name"] == "Task 1"
         assert len(saved_data["comments"]) == 1
+
+
+def test_show_task_displays_tags(runner, mock_config, mock_client):
+    """cupt show prints task tags when present."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_task.return_value = {
+            "id": "t1",
+            "name": "Task 1",
+            "status": {"status": "open"},
+            "space": {"id": "s1"},
+            "folder": {"name": "f1"},
+            "list": {"name": "l1"},
+            "tags": [{"name": "urgent"}, {"name": "billing"}],
+        }
+        mock_client.get_task_comments.return_value = []
+        result = runner.invoke(show_task_cmd, ["t1"])
+        assert result.exit_code == 0
+        assert "Tags:" in result.output
+        assert "urgent" in result.output
+        assert "billing" in result.output
+
+
+def test_list_tasks_offline_tag_filter(runner, mock_config, mock_client):
+    """--tag filter applies in offline mode too."""
+    mock_config.load_task_cache.return_value = {
+        "tasks": [
+            {
+                "id": "t1",
+                "name": "Tagged Task",
+                "status": {"status": "open"},
+                "tags": [{"name": "urgent"}],
+            },
+            {
+                "id": "t2",
+                "name": "Untagged Task",
+                "status": {"status": "open"},
+                "tags": [],
+            },
+        ],
+        "timestamp": time.time(),
+    }
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        result = runner.invoke(list_tasks_cmd, ["--offline", "--tag", "urgent"])
+        assert result.exit_code == 0
+        assert "Tagged Task" in result.output
+        assert "Untagged Task" not in result.output
+
+
+def test_show_task_json_output(runner, mock_config, mock_client):
+    """show --json bundles task + parent + comments as JSON."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_task.return_value = {
+            "id": "t1",
+            "name": "Task 1",
+            "status": {"status": "open"},
+            "space": {"id": "s1"},
+            "folder": {"name": "f1"},
+            "list": {"name": "l1"},
+        }
+        mock_client.get_task_comments.return_value = [
+            {"user": {"username": "alice"}, "text": "a note"}
+        ]
+        result = runner.invoke(show_task_cmd, ["t1", "--json"])
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["task"]["id"] == "t1"
+        assert payload["parent"] is None
+        assert payload["comments"][0]["text"] == "a note"
 
 
 def test_show_task_offline_from_detail_cache(runner, mock_config, mock_client):

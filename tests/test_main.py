@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
+from cupt import __version__
 from cupt.main import cli
 
 
@@ -10,7 +11,7 @@ def test_cli_version():
     runner = CliRunner()
     result = runner.invoke(cli, ["--version"])
     assert result.exit_code == 0
-    assert "0.4.1" in result.output
+    assert __version__ in result.output
 
 
 def test_config_show():
