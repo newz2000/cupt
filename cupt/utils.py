@@ -8,7 +8,7 @@ Library users should not import from this module.
 import re
 import shutil
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Optional
 
 

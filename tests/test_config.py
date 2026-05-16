@@ -78,8 +78,16 @@ def test_task_cache_dir_created_lazily(tmp_path):
 
 def test_top_level_library_imports():
     """`from cupt import ...` must expose the documented public API."""
-    from cupt import (APIError, AuthError, ClickUpClient, ConfigError,
-                      CuptError, NoteService, TaskService, TimeService)
+    from cupt import (
+        APIError,
+        AuthError,
+        ClickUpClient,
+        ConfigError,
+        CuptError,
+        NoteService,
+        TaskService,
+        TimeService,
+    )
 
     # Spot-check: instantiating the client does no I/O and needs only a token.
     client = ClickUpClient("pk_fake")

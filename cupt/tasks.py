@@ -1,16 +1,21 @@
 import json
 import time
 from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import TimeoutError as FuturesTimeoutError
 from typing import Optional
 
 import click
 
 from cupt.context import get_client_context
 from cupt.services.task_service import TaskService
-from cupt.utils import (format_date, format_duration, get_terminal_width,
-                        print_error, print_success, print_warning,
-                        truncate_text)
+from cupt.utils import (
+    format_date,
+    format_duration,
+    get_terminal_width,
+    print_error,
+    print_success,
+    print_warning,
+    truncate_text,
+)
 
 # Fixed column widths in the list view (excluding the trailing name column).
 # Non-verbose: "{id:<12} {status:<12} {due:<18} {name}" -> 12+1+12+1+18+1 = 45
@@ -34,6 +39,7 @@ def _separator_width(verbose: bool) -> int:
     if width is not None:
         return width
     return 140 if verbose else 120
+
 
 # ---------------------------------------------------------------------------
 # list
@@ -332,9 +338,7 @@ def _list_tasks_offline(
         if as_json:
             click.echo("[]")
         else:
-            print_error(
-                "No cached data available. Run 'cupt list' while online first."
-            )
+            print_error("No cached data available. Run 'cupt list' while online first.")
         return []
 
     if not as_json:
@@ -604,9 +608,7 @@ def _show_task_offline(
         if task:
             if as_json:
                 click.echo(
-                    json.dumps(
-                        {"task": task, "parent": None, "comments": []}, indent=2
-                    )
+                    json.dumps({"task": task, "parent": None, "comments": []}, indent=2)
                 )
                 return
             age_minutes = (time.time() - list_cached.get("timestamp", 0)) / 60

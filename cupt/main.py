@@ -15,8 +15,13 @@ from cupt.config import ConfigManager
 from cupt.notes import add_note, list_notes
 from cupt.summary import summary_cmd
 from cupt.tags import tag_group
-from cupt.tasks import (complete_task_cmd, context_cmd, list_tasks_cmd,
-                        prefetch_cmd, show_task_cmd)
+from cupt.tasks import (
+    complete_task_cmd,
+    context_cmd,
+    list_tasks_cmd,
+    prefetch_cmd,
+    show_task_cmd,
+)
 from cupt.time_tracker import time_group
 from cupt.utils import print_error, print_success, print_warning
 
@@ -148,8 +153,7 @@ def auth():
 @cli.command()
 def logout():
     """Clear authentication data"""
-    config = ConfigManager()
-    # Use empty strings for client_id/secret since we just want to call logout()
+    # Empty client_id/secret because we only want logout() to clear stored tokens.
     oauth_manager = OAuthManager("", "")
     oauth_manager.logout()
 
@@ -211,14 +215,14 @@ def config(team_id, default_list, api_token, clear_cache, show):
         # Show if using personal token
         token = config_manager.get("auth.access_token")
         if token and token.startswith("pk_"):
-            click.echo(f"  Auth Method: Personal API Token")
+            click.echo("  Auth Method: Personal API Token")
         else:
-            click.echo(f"  Auth Method: OAuth")
+            click.echo("  Auth Method: OAuth")
         return
 
     if api_token:
         config_manager.set("auth.access_token", api_token)
-        print_success(f"Personal API Token set")
+        print_success("Personal API Token set")
 
     if team_id:
         config_manager.set("user.team_id", team_id)

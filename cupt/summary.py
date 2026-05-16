@@ -1,13 +1,18 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import click
 
 from cupt.context import get_client_context
 from cupt.services.task_service import TaskService
-from cupt.utils import (format_date, format_duration, get_terminal_width,
-                        print_error, truncate_text)
+from cupt.utils import (
+    format_date,
+    format_duration,
+    get_terminal_width,
+    print_error,
+    truncate_text,
+)
 
 # "  {id:<12} {status:<14} {name}"           -> 2+12+1+14+1 = 30 fixed cols
 # "  {id:<12} {status:<14} {due:<18} {name}" -> 2+12+1+14+1+18+1 = 49 fixed

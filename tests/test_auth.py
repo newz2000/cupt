@@ -24,7 +24,6 @@ def test_refresh_tokens_success(manager):
     with patch.object(manager.config, "get", return_value="refresh_token"), patch(
         "requests.post"
     ) as mock_post:
-
         mock_post.return_value.status_code = 200
         mock_post.return_value.json.return_value = {
             "access_token": "new_access",
@@ -66,7 +65,6 @@ def test_callback_handler_success(manager):
         with patch.object(handler, "send_response"), patch.object(
             handler, "send_header"
         ), patch.object(handler, "end_headers"):
-
             handler.do_GET()
 
             assert manager.auth_code == "testcode"
@@ -84,7 +82,6 @@ def test_callback_handler_error(manager):
         with patch.object(handler, "send_response"), patch.object(
             handler, "send_header"
         ), patch.object(handler, "end_headers"):
-
             handler.do_GET()
             assert manager.received is False
             assert manager.auth_code is None

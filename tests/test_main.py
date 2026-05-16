@@ -40,7 +40,6 @@ def test_status_authenticated():
     with patch("cupt.main.ConfigManager") as mock_config, patch(
         "cupt.main.ClickUpClient"
     ) as mock_client:
-
         mock_config.return_value.is_authenticated.return_value = True
         mock_client.return_value.get_user.return_value = {"user": {"username": "matt"}}
         mock_client.return_value.get_teams.return_value = []
@@ -137,8 +136,7 @@ def test_auth_personal_token_success():
     runner = CliRunner()
     with patch("cupt.main.ConfigManager") as mock_config, patch(
         "cupt.main.ClickUpClient"
-    ) as mock_client:
-
+    ):
         instance = mock_config.return_value
         instance.get.return_value = None  # No existing token
 

@@ -1,7 +1,13 @@
 import pytest
 
-from cupt.utils import (format_date, format_duration, format_task_status,
-                        get_terminal_width, parse_duration, truncate_text)
+from cupt.utils import (
+    format_date,
+    format_duration,
+    format_task_status,
+    get_terminal_width,
+    parse_duration,
+    truncate_text,
+)
 
 
 def test_truncate_text():

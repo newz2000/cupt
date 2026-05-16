@@ -3,7 +3,6 @@ OAuth authentication for ClickUp API v1 (updated)
 """
 
 import time
-import urllib.parse
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Dict, Optional
@@ -121,7 +120,9 @@ class OAuthManager:
 
     def _start_callback_server(self) -> Optional[Dict[str, Any]]:
         """Start local HTTP server for OAuth callback"""
-        handler = lambda *args: OAuthCallbackHandler(self, *args)
+
+        def handler(*args):
+            return OAuthCallbackHandler(self, *args)
 
         try:
             print_info(f"Waiting for authentication on port {self.callback_port}...")

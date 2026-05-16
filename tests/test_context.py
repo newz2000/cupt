@@ -48,9 +48,7 @@ def test_skips_team_check_when_not_required():
         mock_cm.return_value.is_authenticated.return_value = True
         mock_cm.return_value.get.side_effect = lambda k, d=None: {
             "auth.access_token": "tok",
-        }.get(
-            k, d
-        )  # no team_id
+        }.get(k, d)  # no team_id
         config, client, team_id = get_client_context(need_team=False)
         assert client is mock_client_cls.return_value
         assert team_id is None

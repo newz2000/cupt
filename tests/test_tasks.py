@@ -4,8 +4,13 @@ from unittest.mock import ANY, MagicMock, call, patch
 
 import pytest
 
-from cupt.tasks import (complete_task_cmd, context_cmd, list_tasks_cmd,
-                        prefetch_cmd, show_task_cmd)
+from cupt.tasks import (
+    complete_task_cmd,
+    context_cmd,
+    list_tasks_cmd,
+    prefetch_cmd,
+    show_task_cmd,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
