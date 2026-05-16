@@ -1,0 +1,80 @@
+name: Publish to PyPI
+
+# Fires on any pushed tag matching v* (e.g. v0.6.2, v1.0.0).
+# To cut a release:
+#   bump cupt/__init__.py __version__
+#   update CHANGELOG.md
+#   commit + push to main
+#   git tag v0.6.2 && git push origin v0.6.2
+#
+# Uses PyPI Trusted Publishing (OIDC) — no API token stored in this repo.
+# The trust relationship is configured at:
+#   https://pypi.org/manage/project/cupt/settings/publishing/
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install package + dev deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pytest
+      - name: Run pytest
+        run: pytest
+
+  build:
+    name: Build sdist + wheel
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build
+        run: python -m pip install --upgrade build
+      - name: Build
+        run: python -m build
+      - name: Validate metadata
+        run: |
+          python -m pip install --upgrade twine
+          twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+
+    # Restricts which workflows + environments can publish on PyPI's side.
+    # PyPI Trusted Publishing config must reference this environment name.
+    environment:
+      name: pypi
+      url: https://pypi.org/p/cupt
+
+    # Required for OIDC: lets the workflow request a short-lived ID token
+    # that PyPI can verify came from this repo + workflow + environment.
+    permissions:
+      id-token: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
