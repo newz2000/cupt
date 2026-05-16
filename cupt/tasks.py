@@ -543,6 +543,11 @@ def _display_task(task, parent_task, comments, include_notes: bool):
     tag_names = [t.get("name", "") for t in (task.get("tags") or []) if t.get("name")]
     if tag_names:
         click.echo(f"Tags:     {', '.join(tag_names)}")
+    attachments = task.get("attachments") or []
+    if attachments:
+        click.echo(
+            f"Attach:   {len(attachments)} file(s) — use 'cupt attach list {task.get('id')}'"
+        )
     click.echo(f"Space:    {task.get('space', {}).get('id')}")
     click.echo(
         f"Folder:   {task.get('folder', {}).get('name', 'N/A')} ({task.get('folder', {}).get('id', 'N/A')})"

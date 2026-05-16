@@ -153,6 +153,39 @@ class ClickUpClient:
     def remove_task_tag(self, task_id: str, tag_name: str) -> Dict[str, Any]:
         return self._make_request("DELETE", f"/task/{task_id}/tag/{tag_name}")
 
+    def upload_task_attachment(
+        self, task_id: str, file_path: str, filename: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Upload a file as a task attachment.
+
+        Bypasses the shared session because that session sets
+        Content-Type: application/json, which prevents `requests` from
+        generating the multipart boundary header and causes the server to
+        receive a malformed body (resulting in corrupted attachments).
+        """
+        import os
+
+        url = f"{self.BASE_URL}/task/{task_id}/attachment"
+        name = filename or os.path.basename(file_path)
+        headers = {"Authorization": self.access_token}
+
+        try:
+            with open(file_path, "rb") as fh:
+                response = requests.post(
+                    url,
+                    headers=headers,
+                    files={"attachment": (name, fh)},
+                    timeout=60,  # uploads can legitimately take longer than reads
+                )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as e:
+            msg = f"HTTP {e.response.status_code}: {e.response.text[:200]}"
+            raise APIError(msg)
+        except requests.exceptions.RequestException as e:
+            raise APIError(f"Upload failed: {e}")
+
     # ------------------------------------------------------------------
     # Statuses
     # ------------------------------------------------------------------

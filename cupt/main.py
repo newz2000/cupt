@@ -9,6 +9,7 @@ import click
 
 from cupt import __version__
 from cupt.api import ClickUpClient
+from cupt.attachments import attach_group
 from cupt.auth import OAuthManager
 from cupt.config import ConfigManager
 from cupt.notes import add_note, list_notes
@@ -240,6 +241,7 @@ cli.add_command(prefetch_cmd)
 
 cli.add_command(time_group)
 cli.add_command(tag_group)
+cli.add_command(attach_group)
 
 cli.add_command(add_note)
 cli.add_command(list_notes)

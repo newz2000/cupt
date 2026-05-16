@@ -202,3 +202,45 @@ def test_api_error_handling(client, mock_session):
     with pytest.raises(Exception) as excinfo:
         client.get_user()
     assert "HTTP 401" in str(excinfo.value)
+
+
+def test_upload_task_attachment_no_json_content_type(client, tmp_path):
+    """
+    Regression: uploads must NOT carry Content-Type: application/json.
+    `requests` only generates the correct multipart boundary header when
+    Content-Type is unset; a stray JSON header corrupts the upload.
+    """
+    upload_file = tmp_path / "x.bin"
+    upload_file.write_bytes(b"abc123")
+
+    fake_response = MagicMock()
+    fake_response.json.return_value = {"id": "a1", "title": "x.bin"}
+    fake_response.raise_for_status.return_value = None
+
+    with patch("cupt.api.requests.post", return_value=fake_response) as mock_post:
+        result = client.upload_task_attachment("t1", str(upload_file))
+        assert result["id"] == "a1"
+        _, kwargs = mock_post.call_args
+        # Auth must be present, but Content-Type must NOT be — let requests
+        # generate the multipart boundary itself.
+        assert kwargs["headers"]["Authorization"] == "test_token"
+        assert "Content-Type" not in kwargs["headers"]
+        assert "content-type" not in {k.lower() for k in kwargs["headers"]}
+        # File must be sent via multipart `files=`, not `data=`/`json=`.
+        assert "files" in kwargs
+        assert "json" not in kwargs
+
+
+def test_upload_task_attachment_uses_filename_override(client, tmp_path):
+    upload_file = tmp_path / "actual.bin"
+    upload_file.write_bytes(b"abc")
+
+    fake_response = MagicMock()
+    fake_response.json.return_value = {"id": "a1", "title": "renamed.bin"}
+    fake_response.raise_for_status.return_value = None
+
+    with patch("cupt.api.requests.post", return_value=fake_response) as mock_post:
+        client.upload_task_attachment("t1", str(upload_file), filename="renamed.bin")
+        _, kwargs = mock_post.call_args
+        sent_name, _ = kwargs["files"]["attachment"]
+        assert sent_name == "renamed.bin"
