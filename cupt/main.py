@@ -13,6 +13,7 @@ from cupt.auth import OAuthManager
 from cupt.config import ConfigManager
 from cupt.notes import add_note, list_notes
 from cupt.summary import summary_cmd
+from cupt.tags import tag_group
 from cupt.tasks import (complete_task_cmd, context_cmd, list_tasks_cmd,
                         prefetch_cmd, show_task_cmd)
 from cupt.time_tracker import time_group
@@ -238,6 +239,7 @@ cli.add_command(context_cmd)
 cli.add_command(prefetch_cmd)
 
 cli.add_command(time_group)
+cli.add_command(tag_group)
 
 cli.add_command(add_note)
 cli.add_command(list_notes)

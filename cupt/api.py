@@ -147,6 +147,12 @@ class ClickUpClient:
     def update_task(self, task_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         return self._make_request("PUT", f"/task/{task_id}", data=data)
 
+    def add_task_tag(self, task_id: str, tag_name: str) -> Dict[str, Any]:
+        return self._make_request("POST", f"/task/{task_id}/tag/{tag_name}")
+
+    def remove_task_tag(self, task_id: str, tag_name: str) -> Dict[str, Any]:
+        return self._make_request("DELETE", f"/task/{task_id}/tag/{tag_name}")
+
     # ------------------------------------------------------------------
     # Statuses
     # ------------------------------------------------------------------

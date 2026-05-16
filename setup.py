@@ -1,3 +1,6 @@
+import re
+from pathlib import Path
+
 from setuptools import setup, find_packages
 
 with open("README.md", "r", encoding="utf-8") as fh:
@@ -6,9 +9,13 @@ with open("README.md", "r", encoding="utf-8") as fh:
 with open("requirements.txt", "r", encoding="utf-8") as fh:
     requirements = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
 
+# Single source of truth: cupt/__init__.py
+_init = Path("cupt/__init__.py").read_text(encoding="utf-8")
+_version = re.search(r'^__version__\s*=\s*"([^"]+)"', _init, re.M).group(1)
+
 setup(
     name="cupt",
-    version="0.4.1",
+    version=_version,
     author="Matthew Nuzum",
     author_email="matthew@nuzum.com",
     description="ClickUp Task Management CLI",
