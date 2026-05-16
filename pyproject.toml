@@ -1,0 +1,38 @@
+# Tool configuration. Package metadata still lives in setup.py for now;
+# migrating to a full pyproject.toml-based build is a separate change.
+
+[tool.ruff]
+line-length = 88
+target-version = "py38"
+extend-exclude = [
+    "venv",
+    ".venv",
+    "build",
+    "dist",
+    "*.egg-info",
+]
+
+[tool.ruff.lint]
+# Conservative starter set. Add more rule families (e.g. UP, B, C4, SIM)
+# once the codebase has been groomed.
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes (unused imports, undefined names)
+    "I",   # isort (import ordering)
+    "W",   # pycodestyle warnings
+]
+ignore = [
+    "E501", # line-too-long — the formatter handles wrapping; long URLs/strings sometimes legitimately exceed 88.
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests use lots of fixtures and mocked symbols that ruff thinks are unused.
+"tests/*" = ["F401", "F811"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q"
