@@ -41,3 +41,15 @@ ENV/
 .cupt/
 config.yaml
 *.log
+.aider*
+
+# Swift experiments (not part of this Python project)
+.build/
+MacOS/
+Models/
+Views/
+Services/
+ViewModels/
+App/
+Package.swift
+*.swift
