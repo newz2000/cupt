@@ -31,7 +31,7 @@ def _closed_task(task_id, name):
 
 def _empty_client(mock_client):
     """Configure mock_client to return empty data for all summary endpoints."""
-    mock_client.get_team_tasks.return_value = []
+    mock_client.get_workspace_tasks.return_value = []
     mock_client.get_time_entries.return_value = []
     mock_client.get_running_timer.return_value = None
 
@@ -59,7 +59,7 @@ def test_summary_cmd_empty(runner, mock_config, mock_client):
 
 
 def test_summary_cmd_all_flag(runner, mock_config, mock_client):
-    """--all renders TEAM SUMMARY instead of YOUR SUMMARY."""
+    """--all renders WORKSPACE SUMMARY instead of YOUR SUMMARY."""
     with patch(
         "cupt.summary.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
@@ -67,7 +67,7 @@ def test_summary_cmd_all_flag(runner, mock_config, mock_client):
         result = runner.invoke(summary_cmd, ["--all"])
 
         assert result.exit_code == 0
-        assert "TEAM SUMMARY" in result.output
+        assert "WORKSPACE SUMMARY" in result.output
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +80,7 @@ def test_summary_due_today_shows_tasks(runner, mock_config, mock_client):
     with patch(
         "cupt.summary.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = [_open_task("t1", "Fix bug")]
+        mock_client.get_workspace_tasks.return_value = [_open_task("t1", "Fix bug")]
         mock_client.get_time_entries.return_value = []
         mock_client.get_running_timer.return_value = None
 
@@ -95,7 +95,7 @@ def test_summary_due_today_task_count(runner, mock_config, mock_client):
     with patch(
         "cupt.summary.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = [
+        mock_client.get_workspace_tasks.return_value = [
             _open_task("t1", "Task A"),
             _open_task("t2", "Task B"),
         ]
@@ -122,7 +122,7 @@ def test_summary_overdue_shows_tasks(runner, mock_config, mock_client):
     with patch(
         "cupt.summary.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = [overdue_task]
+        mock_client.get_workspace_tasks.return_value = [overdue_task]
         mock_client.get_time_entries.return_value = []
         mock_client.get_running_timer.return_value = None
 
@@ -150,7 +150,7 @@ def test_summary_completed_today(runner, mock_config, mock_client):
     with patch(
         "cupt.summary.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.side_effect = _get_team_tasks
+        mock_client.get_workspace_tasks.side_effect = _get_team_tasks
         mock_client.get_time_entries.return_value = []
         mock_client.get_running_timer.return_value = None
 
@@ -173,7 +173,7 @@ def test_summary_open_tasks_excluded_from_completed(runner, mock_config, mock_cl
     with patch(
         "cupt.summary.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.side_effect = _get_team_tasks
+        mock_client.get_workspace_tasks.side_effect = _get_team_tasks
         mock_client.get_time_entries.return_value = []
         mock_client.get_running_timer.return_value = None
 
@@ -194,7 +194,7 @@ def test_summary_time_entries_summed(runner, mock_config, mock_client):
     with patch(
         "cupt.summary.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = []
+        mock_client.get_workspace_tasks.return_value = []
         mock_client.get_time_entries.return_value = entries
         mock_client.get_running_timer.return_value = None
 
@@ -209,7 +209,7 @@ def test_summary_running_timer_shown(runner, mock_config, mock_client):
     with patch(
         "cupt.summary.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = []
+        mock_client.get_workspace_tasks.return_value = []
         mock_client.get_time_entries.return_value = []
         mock_client.get_running_timer.return_value = {
             "start": str(start_ms),
@@ -229,7 +229,7 @@ def test_summary_time_entries_error_degrades_gracefully(
     with patch(
         "cupt.summary.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = []
+        mock_client.get_workspace_tasks.return_value = []
         mock_client.get_time_entries.side_effect = Exception("permission denied")
         mock_client.get_running_timer.return_value = None
 
@@ -249,7 +249,7 @@ def test_summary_api_error(runner, mock_config, mock_client):
     with patch(
         "cupt.summary.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.side_effect = Exception("Network error")
+        mock_client.get_workspace_tasks.side_effect = Exception("Network error")
         mock_client.get_time_entries.return_value = []
         mock_client.get_running_timer.return_value = None
 

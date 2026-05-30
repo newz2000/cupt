@@ -65,7 +65,24 @@ class ConfigManager:
             if isinstance(value, dict) and k in value:
                 value = value[k]
             else:
+                # Legacy fallback for configs written before the team→workspace
+                # rename (pre-0.7). Lets existing installs keep working without
+                # re-running `cupt auth`.
+                if key == "user.workspace_id":
+                    legacy = self._raw_get("user.team_id")
+                    if legacy is not None:
+                        return legacy
                 return default
+        return value
+
+    def _raw_get(self, key: str):
+        """Lookup without the legacy fallback — used internally to avoid recursion."""
+        value = self.load_config()
+        for k in key.split("."):
+            if isinstance(value, dict) and k in value:
+                value = value[k]
+            else:
+                return None
         return value
 
     def set(self, key: str, value: Any):

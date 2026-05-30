@@ -108,45 +108,50 @@ class ClickUpClient:
     def get_user(self) -> Dict[str, Any]:
         return self._make_request("GET", "/user")
 
-    def get_teams(self) -> List[Dict[str, Any]]:
+    def get_workspaces(self) -> List[Dict[str, Any]]:
+        """List workspaces the authenticated user belongs to.
+
+        ClickUp's REST URL is still `/team` (historical name); the current
+        UI calls these "Workspaces".
+        """
         return self._make_request("GET", "/team").get("teams", [])
 
     # ------------------------------------------------------------------
     # Tasks
     # ------------------------------------------------------------------
 
-    def get_team_tasks(
-        self, team_id: str, filters: Optional[Dict] = None
+    def get_workspace_tasks(
+        self, workspace_id: str, filters: Optional[Dict] = None
     ) -> List[Dict[str, Any]]:
         params: Dict = {}
         if filters:
             params.update(filters)
-        return self._make_request("GET", f"/team/{team_id}/task", params=params).get(
-            "tasks", []
-        )
+        return self._make_request(
+            "GET", f"/team/{workspace_id}/task", params=params
+        ).get("tasks", [])
 
     def get_tasks_by_ids(
-        self, team_id: str, task_ids: List[str]
+        self, workspace_id: str, task_ids: List[str]
     ) -> List[Dict[str, Any]]:
         """Bulk-fetch up to 100 tasks by ID."""
         if not task_ids:
             return []
         params = {"ids[]": task_ids[:100], "include_subtasks": "true"}
-        return self._make_request("GET", f"/team/{team_id}/task", params=params).get(
-            "tasks", []
-        )
+        return self._make_request(
+            "GET", f"/team/{workspace_id}/task", params=params
+        ).get("tasks", [])
 
     def get_task(self, task_id: str) -> Dict[str, Any]:
         return self._make_request("GET", f"/task/{task_id}")
 
     def get_task_children(
-        self, team_id: str, parent_id: str, params: Optional[Dict] = None
+        self, workspace_id: str, parent_id: str, params: Optional[Dict] = None
     ) -> List[Dict[str, Any]]:
         """Fetch direct subtasks of a task."""
         p: Dict = {"parent": parent_id}
         if params:
             p.update(params)
-        return self._make_request("GET", f"/team/{team_id}/task", params=p).get(
+        return self._make_request("GET", f"/team/{workspace_id}/task", params=p).get(
             "tasks", []
         )
 
@@ -193,6 +198,20 @@ class ClickUpClient:
             raise APIError(f"Upload failed: {e}")
 
     # ------------------------------------------------------------------
+    # Teams (user-groups within a workspace; ClickUp's REST URL is /group)
+    # ------------------------------------------------------------------
+
+    def get_teams(self, workspace_id: str) -> List[Dict[str, Any]]:
+        """List teams (user-groups) in a workspace.
+
+        ClickUp's REST URL is still `/group` (historical name); the current
+        UI calls these "Teams".
+        """
+        return self._make_request(
+            "GET", "/group", params={"team_id": workspace_id}
+        ).get("groups", [])
+
+    # ------------------------------------------------------------------
     # Statuses
     # ------------------------------------------------------------------
 
@@ -224,30 +243,30 @@ class ClickUpClient:
     # ------------------------------------------------------------------
 
     def start_timer(
-        self, team_id: str, task_id: Optional[str] = None
+        self, workspace_id: str, task_id: Optional[str] = None
     ) -> Dict[str, Any]:
         data: Dict = {}
         if task_id:
             data["task_id"] = task_id
             data["tid"] = task_id
         return self._make_request(
-            "POST", f"/team/{team_id}/time_entries/start", data=data
+            "POST", f"/team/{workspace_id}/time_entries/start", data=data
         )
 
-    def stop_timer(self, team_id: str) -> Dict[str, Any]:
-        return self._make_request("POST", f"/team/{team_id}/time_entries/stop")
+    def stop_timer(self, workspace_id: str) -> Dict[str, Any]:
+        return self._make_request("POST", f"/team/{workspace_id}/time_entries/stop")
 
-    def get_running_timer(self, team_id: str) -> Optional[Dict[str, Any]]:
+    def get_running_timer(self, workspace_id: str) -> Optional[Dict[str, Any]]:
         try:
             return self._make_request(
-                "GET", f"/team/{team_id}/time_entries/current"
+                "GET", f"/team/{workspace_id}/time_entries/current"
             ).get("data")
         except Exception:
             return None
 
     def get_time_entries(
         self,
-        team_id: str,
+        workspace_id: str,
         start_date: int,
         end_date: int,
         user_id: Optional[str] = None,
@@ -257,12 +276,12 @@ class ClickUpClient:
         if user_id:
             params["assignee"] = user_id
         return self._make_request(
-            "GET", f"/team/{team_id}/time_entries", params=params
+            "GET", f"/team/{workspace_id}/time_entries", params=params
         ).get("data", [])
 
     def add_time_entry(
         self,
-        team_id: str,
+        workspace_id: str,
         task_id: str,
         duration: int,
         description: Optional[str] = None,
@@ -277,14 +296,18 @@ class ClickUpClient:
         }
         if description:
             data["description"] = description
-        return self._make_request("POST", f"/team/{team_id}/time_entries", data=data)
+        return self._make_request(
+            "POST", f"/team/{workspace_id}/time_entries", data=data
+        )
 
     # ------------------------------------------------------------------
     # Hierarchy
     # ------------------------------------------------------------------
 
-    def get_spaces(self, team_id: str) -> List[Dict[str, Any]]:
-        return self._make_request("GET", f"/team/{team_id}/space").get("spaces", [])
+    def get_spaces(self, workspace_id: str) -> List[Dict[str, Any]]:
+        return self._make_request("GET", f"/team/{workspace_id}/space").get(
+            "spaces", []
+        )
 
     def get_lists(self, space_id: str) -> List[Dict[str, Any]]:
         return self._make_request("GET", f"/space/{space_id}/list").get("lists", [])

@@ -12,6 +12,69 @@ user impact are not listed.
 
 (nothing yet)
 
+## [0.7.0] — 2026-05-30
+
+### Added
+- `cupt list --team <name|id>` filter — scope the list to tasks
+  assigned to a ClickUp **team** (user-group; e.g. `MattTech`,
+  `AI Agent`). Repeatable; OR semantics. Stacks with `--tag`,
+  `--no-tag`, `--mine`/`--all`, and the date filters.
+- `cupt teams` command — discovery for the IDs and names of teams
+  in the current workspace.
+- `cupt statuses <task-id>` (or `--list <list-id>`) — print all
+  statuses available for a task's list and mark the one `cupt done`
+  would apply. Supports `--json` for agent consumption.
+- `cupt done --dry-run` — resolve and print the target status
+  without mutating the task. Lets agents confirm "which status name
+  exists in this list" before writing.
+- `TaskService.resolve_completion_status(task_id)` — pure helper
+  that returns `{"target", "list_id", "list_name", "all_statuses"}`
+  with no side effects. Canonical entry point for any caller (CLI
+  or library) that needs to know "what does done mean for this
+  task's list".
+- `ClickUpClient.get_teams(workspace_id)` and
+  `TaskService.filter_by_teams(tasks, required=)` library APIs.
+- Legacy config fallback: `user.team_id` written by pre-0.7 installs
+  is still read transparently as the workspace ID, so existing users
+  don't need to re-run `cupt auth` after upgrading.
+
+### Changed (BREAKING — pre-1.0 rename to match ClickUp's current UI)
+ClickUp historically called workspaces "teams" and user-groups
+"groups"; the current UI uses **Workspace** and **Team** respectively.
+`cupt`'s names now match the UI. Underlying REST URLs (`/team`,
+`/group`) are unchanged; this is purely a naming alignment.
+
+- **CLI flags**
+  - `--team-id` → `--workspace-id` (on `cupt list`, `cupt prefetch`,
+    `cupt config`, `cupt teams`)
+  - `cupt list --group` → `cupt list --team`
+- **CLI commands**
+  - `cupt groups` → `cupt teams`
+- **Output / messages**
+  - `cupt status` prints `Workspace:` (was `Team:`)
+  - `cupt config --show` prints `Workspace ID:` (was `Team ID:`)
+  - `cupt summary --all` prints `WORKSPACE SUMMARY` (was `TEAM SUMMARY`)
+- **Library API**
+  - `ClickUpClient.get_teams()` (returned workspaces) →
+    `ClickUpClient.get_workspaces()`
+  - `ClickUpClient.get_user_groups(team_id)` → `get_teams(workspace_id)`
+    (returns user-groups, i.e. ClickUp UI "Teams")
+  - `ClickUpClient.get_team_tasks(team_id, ...)` →
+    `get_workspace_tasks(workspace_id, ...)`
+  - `TaskService.list_tasks(team_id=...)` → `list_tasks(workspace_id=...)`
+  - `TaskService.resolve_parent_names(team_id, ...)` →
+    `resolve_parent_names(workspace_id, ...)`
+  - `TaskService.get_task_context(task_id, team_id, ...)` →
+    `get_task_context(task_id, workspace_id, ...)`
+  - `TaskService.filter_by_groups(...)` → `filter_by_teams(...)`
+  - `TimeService(client, team_id)` → `TimeService(client, workspace_id)`
+  - All `team_id`-named parameters across `ClickUpClient`'s timer,
+    time-entry, and space methods are now `workspace_id`.
+- **Config key**
+  - On disk: `user.team_id` → `user.workspace_id`. Existing
+    `user.team_id` is read transparently as a fallback (see Added).
+    Re-running `cupt config --workspace-id <id>` writes the new key.
+
 ## [0.6.2] — 2026-05-16
 
 No functional or library changes. First release published automatically

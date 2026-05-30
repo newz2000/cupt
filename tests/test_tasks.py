@@ -10,6 +10,7 @@ from cupt.tasks import (
     list_tasks_cmd,
     prefetch_cmd,
     show_task_cmd,
+    statuses_cmd,
 )
 
 # ---------------------------------------------------------------------------
@@ -31,7 +32,7 @@ def test_list_tasks_cli(runner, mock_config, mock_client):
     with patch(
         "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = [
+        mock_client.get_workspace_tasks.return_value = [
             {"id": "t1", "name": "Task 1", "status": {"status": "open", "type": "open"}}
         ]
         result = runner.invoke(list_tasks_cmd)
@@ -43,7 +44,7 @@ def test_list_tasks_filters(runner, mock_config, mock_client):
     with patch(
         "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = []
+        mock_client.get_workspace_tasks.return_value = []
         for flag in ["--overdue", "--today", "--week"]:
             result = runner.invoke(list_tasks_cmd, [flag])
             assert result.exit_code == 0
@@ -53,7 +54,7 @@ def test_list_tasks_hide_subtasks(runner, mock_config, mock_client):
     with patch(
         "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = [
+        mock_client.get_workspace_tasks.return_value = [
             {
                 "id": "t1",
                 "name": "Top Task",
@@ -76,7 +77,7 @@ def test_list_tasks_limit(runner, mock_config, mock_client):
     with patch(
         "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = [
+        mock_client.get_workspace_tasks.return_value = [
             {
                 "id": f"t{i}",
                 "name": f"Task {i}",
@@ -95,7 +96,7 @@ def test_list_tasks_shows_parent_name(runner, mock_config, mock_client):
     with patch(
         "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = [
+        mock_client.get_workspace_tasks.return_value = [
             {
                 "id": "s1",
                 "name": "Sub Task",
@@ -116,7 +117,7 @@ def test_list_tasks_triggers_background_cache(runner, mock_config, mock_client):
     with patch(
         "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = [
+        mock_client.get_workspace_tasks.return_value = [
             {
                 "id": "t1",
                 "name": "Task 1",
@@ -137,7 +138,7 @@ def test_list_tasks_filter_by_tag(runner, mock_config, mock_client):
     with patch(
         "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = [
+        mock_client.get_workspace_tasks.return_value = [
             {
                 "id": "t1",
                 "name": "Has Urgent",
@@ -162,7 +163,7 @@ def test_list_tasks_filter_by_no_tag(runner, mock_config, mock_client):
     with patch(
         "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = [
+        mock_client.get_workspace_tasks.return_value = [
             {
                 "id": "t1",
                 "name": "Has Waiting",
@@ -182,12 +183,74 @@ def test_list_tasks_filter_by_no_tag(runner, mock_config, mock_client):
         assert "Has Waiting" not in result.output
 
 
+def test_list_tasks_filter_by_team(runner, mock_config, mock_client):
+    """--team X keeps only tasks assigned to that team (by name)."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_workspace_tasks.return_value = [
+            {
+                "id": "t1",
+                "name": "MattTech Work",
+                "status": {"status": "open", "type": "open"},
+                "group_assignees": [{"id": "g1", "name": "MattTech"}],
+            },
+            {
+                "id": "t2",
+                "name": "AI Agent Work",
+                "status": {"status": "open", "type": "open"},
+                "group_assignees": [{"id": "g2", "name": "AI Agent"}],
+            },
+        ]
+        result = runner.invoke(list_tasks_cmd, ["--team", "MattTech"])
+        assert result.exit_code == 0
+        assert "MattTech Work" in result.output
+        assert "AI Agent Work" not in result.output
+
+
+def test_list_tasks_team_stacks_with_tag(runner, mock_config, mock_client):
+    """--team and --tag stack: task must match both."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_workspace_tasks.return_value = [
+            {
+                "id": "t1",
+                "name": "MattTech Ready",
+                "status": {"status": "open", "type": "open"},
+                "group_assignees": [{"id": "g1", "name": "MattTech"}],
+                "tags": [{"name": "ai_ready"}],
+            },
+            {
+                "id": "t2",
+                "name": "MattTech Question",
+                "status": {"status": "open", "type": "open"},
+                "group_assignees": [{"id": "g1", "name": "MattTech"}],
+                "tags": [{"name": "ai_question"}],
+            },
+            {
+                "id": "t3",
+                "name": "Other Group Ready",
+                "status": {"status": "open", "type": "open"},
+                "group_assignees": [{"id": "g2", "name": "Other"}],
+                "tags": [{"name": "ai_ready"}],
+            },
+        ]
+        result = runner.invoke(
+            list_tasks_cmd, ["--team", "MattTech", "--tag", "ai_ready"]
+        )
+        assert result.exit_code == 0
+        assert "MattTech Ready" in result.output
+        assert "MattTech Question" not in result.output
+        assert "Other Group Ready" not in result.output
+
+
 def test_list_tasks_sends_tags_to_api(runner, mock_config, mock_client):
     """--tag is pushed to the ClickUp API as tags[] (server-side filtering)."""
     with patch(
         "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = [
+        mock_client.get_workspace_tasks.return_value = [
             {
                 "id": "t1",
                 "name": "Task 1",
@@ -197,7 +260,7 @@ def test_list_tasks_sends_tags_to_api(runner, mock_config, mock_client):
         ]
         result = runner.invoke(list_tasks_cmd, ["--tag", "urgent"])
         assert result.exit_code == 0
-        filters = mock_client.get_team_tasks.call_args[0][1]
+        filters = mock_client.get_workspace_tasks.call_args[0][1]
         assert filters["tags[]"] == ["urgent"]
 
 
@@ -207,7 +270,7 @@ def test_list_tasks_stacked_tags_or_then_and(runner, mock_config, mock_client):
         "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
         # Server returns the OR'd candidate set (a OR b).
-        mock_client.get_team_tasks.return_value = [
+        mock_client.get_workspace_tasks.return_value = [
             {
                 "id": "t1",
                 "name": "Just A",
@@ -230,7 +293,7 @@ def test_list_tasks_stacked_tags_or_then_and(runner, mock_config, mock_client):
         result = runner.invoke(list_tasks_cmd, ["--tag", "a", "--tag", "b"])
         assert result.exit_code == 0
         # API got both tags (OR semantics).
-        filters = mock_client.get_team_tasks.call_args[0][1]
+        filters = mock_client.get_workspace_tasks.call_args[0][1]
         assert set(filters["tags[]"]) == {"a", "b"}
         # Client narrowed to the AND set.
         assert "A and B" in result.output
@@ -243,7 +306,7 @@ def test_list_tasks_tag_filters_stack(runner, mock_config, mock_client):
     with patch(
         "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = [
+        mock_client.get_workspace_tasks.return_value = [
             {
                 "id": "t1",
                 "name": "A only",
@@ -277,7 +340,7 @@ def test_list_tasks_tag_filter_no_matches(runner, mock_config, mock_client):
     with patch(
         "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = [
+        mock_client.get_workspace_tasks.return_value = [
             {
                 "id": "t1",
                 "name": "Task 1",
@@ -287,7 +350,7 @@ def test_list_tasks_tag_filter_no_matches(runner, mock_config, mock_client):
         ]
         result = runner.invoke(list_tasks_cmd, ["--tag", "missing"])
         assert result.exit_code == 0
-        assert "No tasks matched the tag filter" in result.output
+        assert "No tasks matched the filter" in result.output
 
 
 def test_list_tasks_json_output(runner, mock_config, mock_client):
@@ -295,7 +358,7 @@ def test_list_tasks_json_output(runner, mock_config, mock_client):
     with patch(
         "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = [
+        mock_client.get_workspace_tasks.return_value = [
             {
                 "id": "t1",
                 "name": "Task 1",
@@ -325,7 +388,7 @@ def test_list_tasks_json_respects_tag_filter(runner, mock_config, mock_client):
     with patch(
         "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = [
+        mock_client.get_workspace_tasks.return_value = [
             {
                 "id": "t1",
                 "name": "Tagged",
@@ -350,7 +413,7 @@ def test_list_tasks_json_empty(runner, mock_config, mock_client):
     with patch(
         "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = []
+        mock_client.get_workspace_tasks.return_value = []
         result = runner.invoke(list_tasks_cmd, ["--json"])
         assert result.exit_code == 0
         assert json.loads(result.output) == []
@@ -360,22 +423,22 @@ def test_list_tasks_exception(runner, mock_config, mock_client):
     with patch(
         "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.side_effect = Exception("API Error")
+        mock_client.get_workspace_tasks.side_effect = Exception("API Error")
         result = runner.invoke(list_tasks_cmd)
         assert "Failed to list tasks" in result.output
 
 
-def test_list_tasks_no_team_id(runner, mock_client):
-    """list_tasks prints its own error when team_id is absent (uses need_team=False)."""
-    no_team_config = MagicMock()
-    no_team_config.is_authenticated.return_value = True
-    no_team_config.get.return_value = None
+def test_list_tasks_no_workspace_id(runner, mock_client):
+    """list_tasks prints its own error when workspace_id is absent (uses need_workspace=False)."""
+    no_ws_config = MagicMock()
+    no_ws_config.is_authenticated.return_value = True
+    no_ws_config.get.return_value = None
     with patch(
         "cupt.tasks.get_client_context",
-        return_value=(no_team_config, mock_client, None),
+        return_value=(no_ws_config, mock_client, None),
     ):
         result = runner.invoke(list_tasks_cmd)
-        assert "Team ID not set" in result.output
+        assert "Workspace ID not set" in result.output
 
 
 def test_tasks_auth_error(runner):
@@ -531,6 +594,41 @@ def test_complete_task_no_list_id(runner, mock_config, mock_client):
         mock_client.get_task.return_value = {"id": "t1", "list": {}}
         result = runner.invoke(complete_task_cmd, ["t1"])
         assert "Could not find list" in result.output
+
+
+def test_complete_task_dry_run_does_not_mutate(runner, mock_config, mock_client):
+    """--dry-run prints the resolved status but never calls update_task."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_task.return_value = {
+            "id": "t1",
+            "list": {"id": "l1", "name": "My Project"},
+        }
+        mock_client.get_list_statuses.return_value = [
+            {"status": "Done", "type": "closed"}
+        ]
+        result = runner.invoke(complete_task_cmd, ["t1", "--dry-run"])
+        assert result.exit_code == 0
+        assert "Would mark task t1 as 'Done'" in result.output
+        assert "My Project" in result.output
+        # CRITICAL: no mutation.
+        mock_client.update_task.assert_not_called()
+        mock_client.add_task_comment.assert_not_called()
+
+
+def test_complete_task_dry_run_skips_auto_note(runner, mock_config, mock_client):
+    """--dry-run must not trigger the AI note flow even if --auto-note is set."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ), patch("cupt.tasks._get_auto_note") as auto:
+        mock_client.get_task.return_value = {"id": "t1", "list": {"id": "l1"}}
+        mock_client.get_list_statuses.return_value = [
+            {"status": "Done", "type": "closed"}
+        ]
+        result = runner.invoke(complete_task_cmd, ["t1", "--dry-run", "--auto-note"])
+        assert result.exit_code == 0
+        auto.assert_not_called()
 
 
 def test_complete_task_fallback_to_space_statuses(runner, mock_config, mock_client):
@@ -865,7 +963,7 @@ def test_prefetch_cmd_caches_tasks(runner, mock_config, mock_client):
     with patch(
         "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = [
+        mock_client.get_workspace_tasks.return_value = [
             {
                 "id": "t1",
                 "name": "Task 1",
@@ -894,7 +992,7 @@ def test_prefetch_cmd_respects_limit(runner, mock_config, mock_client):
     with patch(
         "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = [
+        mock_client.get_workspace_tasks.return_value = [
             {
                 "id": f"t{i}",
                 "name": f"Task {i}",
@@ -918,8 +1016,80 @@ def test_prefetch_cmd_no_tasks(runner, mock_config, mock_client):
     with patch(
         "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_team_tasks.return_value = []
+        mock_client.get_workspace_tasks.return_value = []
         result = runner.invoke(prefetch_cmd, [])
         assert result.exit_code == 0
         assert "No tasks found" in result.output
         mock_config.save_task_detail.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# statuses
+# ---------------------------------------------------------------------------
+
+
+def test_statuses_by_task_id_highlights_closed_status(runner, mock_config, mock_client):
+    """`cupt statuses <task-id>` resolves to the task's list and marks the
+    status `cupt done` would apply."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_task.return_value = {
+            "id": "t1",
+            "list": {"id": "l1", "name": "My Project"},
+        }
+        mock_client.get_list_statuses.return_value = [
+            {"status": "to do", "type": "open"},
+            {"status": "in progress", "type": "custom"},
+            {"status": "Done", "type": "closed"},
+        ]
+        result = runner.invoke(statuses_cmd, ["t1"])
+        assert result.exit_code == 0
+        assert "My Project" in result.output
+        assert "to do" in result.output
+        assert "Done" in result.output
+        assert "cupt done resolves here" in result.output
+
+
+def test_statuses_by_list_id_skips_task_lookup(runner, mock_config, mock_client):
+    """`--list` bypasses the task resolution and queries the list directly."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_list_statuses.return_value = [
+            {"status": "Complete", "type": "closed"}
+        ]
+        result = runner.invoke(statuses_cmd, ["l1", "--list"])
+        assert result.exit_code == 0
+        assert "Complete" in result.output
+        # No task fetch — the user passed a list ID directly.
+        mock_client.get_task.assert_not_called()
+
+
+def test_statuses_json_output_includes_target(runner, mock_config, mock_client):
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_task.return_value = {
+            "id": "t1",
+            "list": {"id": "l1", "name": "My Project"},
+        }
+        mock_client.get_list_statuses.return_value = [
+            {"status": "Done", "type": "closed"}
+        ]
+        result = runner.invoke(statuses_cmd, ["t1", "--json"])
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["target"] == "Done"
+        assert payload["list_id"] == "l1"
+        assert payload["list_name"] == "My Project"
+        assert payload["statuses"][0]["status"] == "Done"
+
+
+def test_statuses_handles_missing_list(runner, mock_config, mock_client):
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_task.return_value = {"id": "t1", "list": {}}
+        result = runner.invoke(statuses_cmd, ["t1"])
+        assert "Could not find list" in result.output

@@ -25,7 +25,7 @@ _SUMMARY_FIXED_WIDTH_WITH_DATE = 49
     "--all",
     "show_all",
     is_flag=True,
-    help="Show team-wide summary instead of just your tasks",
+    help="Show workspace-wide summary instead of just your tasks",
 )
 def summary_cmd(show_all):
     """Show a daily summary: due today, overdue, completed, and time tracked"""
@@ -34,7 +34,7 @@ def summary_cmd(show_all):
 
 def show_summary(mine: bool = True):
     """Fetch and display a daily task and time summary."""
-    config, client, team_id = get_client_context()
+    config, client, workspace_id = get_client_context()
     if not client:
         return
 
@@ -48,11 +48,13 @@ def show_summary(mine: bool = True):
 
     # All fetches are independent — run concurrently.
     def _fetch_due_today():
-        return task_service.list_tasks(team_id, user_id=user_id, today=True, mine=mine)
+        return task_service.list_tasks(
+            workspace_id, user_id=user_id, today=True, mine=mine
+        )
 
     def _fetch_overdue():
         return task_service.list_tasks(
-            team_id, user_id=user_id, overdue=True, mine=mine
+            workspace_id, user_id=user_id, overdue=True, mine=mine
         )
 
     def _fetch_completed_today():
@@ -64,7 +66,7 @@ def show_summary(mine: bool = True):
         }
         if mine and user_id:
             params["assignees[]"] = [user_id]
-        tasks = client.get_team_tasks(team_id, params)
+        tasks = client.get_workspace_tasks(workspace_id, params)
         return [
             t for t in tasks if t.get("status", {}).get("type") in ("done", "closed")
         ]
@@ -72,13 +74,13 @@ def show_summary(mine: bool = True):
     def _fetch_time_entries():
         try:
             return client.get_time_entries(
-                team_id, today_ms, tomorrow_ms, user_id=user_id
+                workspace_id, today_ms, tomorrow_ms, user_id=user_id
             )
         except Exception:
             return []
 
     def _fetch_running_timer():
-        return client.get_running_timer(team_id)
+        return client.get_running_timer(workspace_id)
 
     try:
         with ThreadPoolExecutor(max_workers=5) as executor:
@@ -103,7 +105,7 @@ def show_summary(mine: bool = True):
     # ------------------------------------------------------------------ #
 
     day_label = datetime.now().strftime("%A, %B %-d, %Y")
-    scope = "Your" if mine else "Team"
+    scope = "Your" if mine else "Workspace"
     click.echo(f"\n{scope.upper()} SUMMARY  —  {day_label}")
     click.echo("=" * 60)
 

@@ -56,7 +56,7 @@ class TaskService:
 
     def list_tasks(
         self,
-        team_id: str,
+        workspace_id: str,
         user_id: Optional[str] = None,
         overdue: bool = False,
         today: bool = False,
@@ -84,7 +84,7 @@ class TaskService:
 
         while page < limit_pages:
             filters["page"] = page
-            tasks = self.client.get_team_tasks(team_id, filters)
+            tasks = self.client.get_workspace_tasks(workspace_id, filters)
 
             if not tasks:
                 break
@@ -147,8 +147,43 @@ class TaskService:
 
         return [t for t in tasks if keep(t)]
 
+    @staticmethod
+    def filter_by_teams(
+        tasks: List[Dict[str, Any]],
+        required: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Filter tasks by team (user-group) assignee (case-insensitive).
+
+        `required` matches against each team's `id` OR `name`. OR semantics:
+        a task is kept if any of its `group_assignees` matches any entry in
+        `required`. Pure function; no I/O. ClickUp's filter API doesn't
+        expose team assignees as a server-side filter, so this runs over
+        whatever the caller already paginated. The task field is named
+        `group_assignees` for historical reasons — same concept.
+        """
+        if not required:
+            return tasks
+        req = {g.lower() for g in required}
+
+        def keep(task: Dict[str, Any]) -> bool:
+            present: set = set()
+            for g in task.get("group_assignees") or []:
+                gid = g.get("id")
+                gname = g.get("name")
+                if gid is not None:
+                    present.add(str(gid).lower())
+                if gname:
+                    present.add(gname.lower())
+            return bool(req & present)
+
+        return [t for t in tasks if keep(t)]
+
     def resolve_parent_names(
-        self, team_id: str, tasks: List[Dict[str, Any]], parent_cache: Dict[str, str]
+        self,
+        workspace_id: str,
+        tasks: List[Dict[str, Any]],
+        parent_cache: Dict[str, str],
     ) -> None:
         """Enrich tasks with parent names using a persistent cache and bulk/individual API fallback."""
         missing_ids = [
@@ -167,7 +202,7 @@ class TaskService:
         try:
             for i in range(0, len(unique_missing), 100):
                 for pt in self.client.get_tasks_by_ids(
-                    team_id, unique_missing[i : i + 100]
+                    workspace_id, unique_missing[i : i + 100]
                 ):
                     parent_cache[pt["id"]] = pt.get("name", pt["id"])
         except Exception:
@@ -194,47 +229,79 @@ class TaskService:
     # Task completion
     # ------------------------------------------------------------------
 
-    def complete_task(self, task_id: str, note: Optional[str] = None) -> str:
-        """
-        Mark a task complete and optionally add a note.
+    # Status names treated as "closed" when a list has no status explicitly
+    # typed `closed`. Lower-cased for case-insensitive matching.
+    _DONE_NAMES = frozenset({"complete", "closed", "resolved", "done"})
 
-        Resolves the correct "closed" status from the task's list, falling
-        back to the parent space if the list carries no statuses.
+    def resolve_completion_status(self, task_id: str) -> Dict[str, Any]:
+        """
+        Figure out which status would mark a task complete, without writing.
+
+        This is the canonical helper for agents that need to mark tasks done
+        across lists with diverging status schemas. The resolution rules:
+
+          1. Fetch the task's list statuses (and fall back to the space's
+             statuses if the list has none).
+          2. Prefer a status explicitly typed `closed`.
+          3. Otherwise pick a status whose name matches a common done-name
+             (`complete`, `closed`, `resolved`, `done`; case-insensitive).
+          4. Last resort: the literal string `"complete"` — which will
+             likely 400 from ClickUp, but at least surfaces the problem
+             instead of mutating to a wrong status.
 
         Returns:
-            The status name that was applied (e.g. "Done").
+            ``{"target": <status name>, "list_id": <id>,
+               "list_name": <name or None>, "all_statuses": [<dict>, ...]}``
 
         Raises:
             ValueError: If the task's list ID cannot be determined.
         """
         task = self.client.get_task(task_id)
-        list_id = task.get("list", {}).get("id")
+        list_obj = task.get("list") or {}
+        list_id = list_obj.get("id")
 
         if not list_id:
             raise ValueError(f"Could not find list for task {task_id}")
 
         statuses = self.client.get_list_statuses(list_id)
-
         if not statuses:
-            space_id = task.get("space", {}).get("id")
+            space_id = (task.get("space") or {}).get("id")
             if space_id:
                 statuses = self.client.get_space_statuses(space_id)
 
-        # Prefer the status explicitly typed as "closed".
-        target_status = next(
+        target = next(
             (s["status"] for s in statuses if s.get("type") == "closed"), None
         )
-        # Fall back to common names.
-        if not target_status:
-            _DONE_NAMES = {"complete", "closed", "resolved", "done"}
-            target_status = next(
+        if not target:
+            target = next(
                 (
                     s["status"]
                     for s in statuses
-                    if s.get("status", "").lower() in _DONE_NAMES
+                    if s.get("status", "").lower() in self._DONE_NAMES
                 ),
                 "complete",
             )
+
+        return {
+            "target": target,
+            "list_id": list_id,
+            "list_name": list_obj.get("name"),
+            "all_statuses": statuses,
+        }
+
+    def complete_task(self, task_id: str, note: Optional[str] = None) -> str:
+        """
+        Mark a task complete and optionally add a note.
+
+        Delegates status resolution to :meth:`resolve_completion_status` so
+        the "what status name would be applied" question has exactly one
+        implementation. Returns the status name that was applied.
+
+        Raises:
+            ValueError: If the task's list ID cannot be determined.
+        """
+        resolved = self.resolve_completion_status(task_id)
+        target_status = resolved["target"]
 
         self.client.update_task(task_id, {"status": target_status})
         if note:
@@ -247,7 +314,7 @@ class TaskService:
     # ------------------------------------------------------------------
 
     def get_task_context(
-        self, task_id: str, team_id: str, show_completed: bool = False
+        self, task_id: str, workspace_id: str, show_completed: bool = False
     ) -> Optional[Dict[str, Any]]:
         """
         Fetch a task with its notes, parent, and siblings/subtasks.
@@ -278,7 +345,9 @@ class TaskService:
                 return None
 
         def _fetch_children():
-            return self.client.get_task_children(team_id, target_parent, child_params)
+            return self.client.get_task_children(
+                workspace_id, target_parent, child_params
+            )
 
         with ThreadPoolExecutor(max_workers=3) as executor:
             fut_notes = executor.submit(_fetch_notes)

@@ -15,7 +15,7 @@ def tag_group():
 @click.argument("tag_name")
 def add_tag(task_id, tag_name):
     """Add a tag to a task"""
-    _, client, _ = get_client_context(need_team=False)
+    _, client, _ = get_client_context(need_workspace=False)
     if not client:
         return
 
@@ -31,7 +31,7 @@ def add_tag(task_id, tag_name):
 @click.argument("tag_name")
 def remove_tag(task_id, tag_name):
     """Remove a tag from a task"""
-    _, client, _ = get_client_context(need_team=False)
+    _, client, _ = get_client_context(need_workspace=False)
     if not client:
         return
 

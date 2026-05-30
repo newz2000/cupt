@@ -72,28 +72,53 @@ Feel free to pick or reorder sections as per your workflow.
 19️⃣ **Offline support** *(investigate)*
    - Explore caching the full task list locally so read-only commands (`list`, `show`, `context`) work without a network connection.
    - Consider a TTL-based cache refresh strategy and a `--offline` flag to force local data.
- Phase 5 – Local AI Integration *(future)*
-   OS-level AI tools are becoming standard on both macOS and Windows. cupt is well-positioned
-   to use them for natural-language features that degrade gracefully when unavailable.
+19️⃣ᵃ **Team filter for `cupt list`** ✅ *(shipped 2026-05-30; renamed to match ClickUp UI in same window)*
+   - ClickUp distinguishes the **workspace** (`--workspace-id`, previously `--team-id`) from **teams** (user-groups within the workspace, e.g. "MattTech", "AI Agent"). Teams show up on tasks as `group_assignees` in the JSON.
+   - `cupt list --team <name|id>` (repeatable, OR semantics) stacks cleanly with `--tag`, `--no-tag`, `--mine`/`--all`, and the date filters.
+   - `cupt teams` lists `id`, `name`, and member count for the workspace.
+   - Filter runs client-side by walking `task.group_assignees[].id` (ClickUp's filter API doesn't expose team assignees server-side, so result quality depends on pagination — combine with `--all` if a team's tasks are rare).
+20️⃣ᵃ **Per-list status discovery and "mark complete" normalization** ✅ *(shipped 2026-05-30)*
+   - `cupt statuses <task-id>` (or `--list <list-id>`) — print all statuses available for a list, with the one `cupt done` would apply marked. Supports `--json`.
+   - `cupt done --dry-run` — resolve and print the target status without mutating.
+   - `TaskService.resolve_completion_status(task_id)` — pure helper documented in AGENTS.md as the canonical entry point.
+   - Multi-list regression: `tests/test_task_service.py::test_complete_task_resolves_per_list_not_globally` proves two tasks in lists with different closed names each get the right one.
+ Phase 5 – Local AI Integration *(future, needs design review first)*
+   OS-level AI tools are becoming standard on both macOS and Windows. cupt is well-positioned to use them, but **before expanding this work we need to think harder about whether it's actually useful for our audience.** The current Apple-Intelligence-only `--auto-note` flag is partial Phase 5 and went largely unused; that should inform the next pass.
 
-20️⃣ **AI backend abstraction**
+   **Open design questions to resolve before writing more code:**
+   - Who is this for? `cupt` users skew toward power-users / engineers / agent-driven workflows. Do they actually want AI-drafted notes, or do they want raw data they can pipe into their own tooling (which already works via `--json`)?
+   - What does "good" look like? A completion-note suggestion has to clear a quality bar — a generic "Completed the task as described" is worse than no suggestion. How do we measure that?
+   - Where is the friction worst? `cupt summary --ai` might be more valuable than `cupt done --auto-note` because the summary involves more synthesis. Worth prototyping before committing to an abstraction.
+   - Backend story: is local-only the right constraint? Cloud AI (Claude, OpenAI) gives much better output but adds privacy/cost considerations that change who the audience is.
+   - Should it stay in core, or live in a separate `cupt-ai` plugin so the base CLI stays lean?
+
+20️⃣ **AI backend abstraction** *(blocked on design review above)*
    - Introduce an optional `AIProvider` interface in `cupt/ai.py` with a single `complete(prompt) -> str` method.
-   - Detect and prefer available backends in order:
+   - Candidate backends (priority TBD):
      1. **Ollama** — query `http://localhost:11434` (cross-platform, developer-friendly)
-     2. **Apple Intelligence / MLX** — invoke via subprocess or Apple's `FoundationModels` framework (macOS 26+ / Apple Silicon)
+     2. **Apple Intelligence / MLX** — already partially shipped via `apple-fm-sdk`; needs to be folded into the abstraction
      3. **Windows Copilot** — invoke via WinRT `Microsoft.Windows.AI` APIs (Windows 11)
      4. **Claude API** — fallback if an `ANTHROPIC_API_KEY` env var is set
    - If no backend is available, features that require AI are silently skipped or show a friendly hint.
 
-21️⃣ **AI-enhanced `--auto-note`**
-   - When completing a task (`cupt done <id> --auto-note`), fetch the task title, description, and recent comments.
-   - Pass to the AI backend: "Suggest a brief completion note for this task: {context}".
-   - Present the suggestion and prompt the user to accept, edit, or skip before saving.
+21️⃣ **AI-enhanced `--auto-note`** *(partial: Apple Intelligence works today; blocked on design review for broader rollout)*
+   - Already implemented for `apple-fm-sdk`. Pulls task title, description, and recent comments; presents suggestion with `[a]ccept / [e]dit / [s]kip`.
+   - Not declared as a dependency or surfaced in the README — see design-review notes above before changing that.
 
-22️⃣ **AI-enhanced `cupt summary`**
+22️⃣ **AI-enhanced `cupt summary`** *(not started)*
    - After assembling the raw summary data, optionally pass it to the AI backend for a one-paragraph plain-English callout.
    - Example output: "You have 2 overdue items — the client inquiry from Monday looks most urgent. You've tracked 3h 45m today, slightly under your usual pace."
    - Controlled by a `--ai` flag so it's opt-in; raw summary always shown first.
+ Phase 6 – Pie in the Sky *(future, after Phase 5)*
+23️⃣ **Policy ingestion from ClickUp documents**
+   - Idea: when processing a task, look up the list or folder it lives in and check whether a designated document (e.g., one tagged `policy` or named `AGENT_POLICY.md`) lives there. If found, pull its contents and feed them to the agent as system-level guidance before it acts on the task.
+   - Open questions to resolve before implementing:
+     * Discovery rule — naming convention vs. tag vs. explicit pointer in folder metadata?
+     * Scope — does a folder-level policy override a list-level one? How are conflicts resolved?
+     * Caching — policies will change rarely; cache aggressively with a manual `cupt policy refresh`.
+     * Surface — is this an implicit feature (agents always see policies) or opt-in via `cupt policy show <task-id>` and a `--with-policy` flag?
+   - Likely depends on the AIProvider abstraction from Phase 5, so park here until that lands.
+
  Deliverables
 - Updated test suite with ≥ 80 % coverage.
 - Clean, type‑annotated, well‑logged code.

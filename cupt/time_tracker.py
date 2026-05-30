@@ -23,12 +23,12 @@ def time_group():
 @click.argument("task_id")
 def start_timer(task_id):
     """Start time tracking for a task"""
-    _, client, team_id = get_client_context()
+    _, client, workspace_id = get_client_context()
     if not client:
         return
 
     try:
-        service = TimeService(client, team_id)
+        service = TimeService(client, workspace_id)
         if service.get_running_timer():
             print_warning("Timer is already running. Stop current timer first.")
             return
@@ -42,12 +42,12 @@ def start_timer(task_id):
 @click.argument("task_id", required=False)
 def stop_timer(task_id=None):
     """Stop current time tracking"""
-    _, client, team_id = get_client_context()
+    _, client, workspace_id = get_client_context()
     if not client:
         return
 
     try:
-        service = TimeService(client, team_id)
+        service = TimeService(client, workspace_id)
         if not service.get_running_timer():
             print_warning("No timer is currently running.")
             return
@@ -60,12 +60,12 @@ def stop_timer(task_id=None):
 @time_group.command("status")
 def timer_status():
     """Show current timer status"""
-    _, client, team_id = get_client_context()
+    _, client, workspace_id = get_client_context()
     if not client:
         return
 
     try:
-        service = TimeService(client, team_id)
+        service = TimeService(client, workspace_id)
         running_timer = service.get_running_timer()
 
         if running_timer:
@@ -89,7 +89,7 @@ def timer_status():
 @click.option("-m", "--message", help="Description for the time entry")
 def add_time(task_id, duration, message):
     """Add manual time entry to a task"""
-    _, client, team_id = get_client_context()
+    _, client, workspace_id = get_client_context()
     if not client:
         return
 
@@ -99,7 +99,7 @@ def add_time(task_id, duration, message):
         return
 
     try:
-        TimeService(client, team_id).add_manual_time(task_id, duration_ms, message)
+        TimeService(client, workspace_id).add_manual_time(task_id, duration_ms, message)
         print_success(f"Added {format_duration(duration_ms)} to task {task_id}")
         if message:
             print_success(f"Note: {message}")

@@ -46,7 +46,7 @@ def attach_group():
 @click.argument("task_id")
 def list_attachments(task_id):
     """List attachments on a task"""
-    _, client, _ = get_client_context(need_team=False)
+    _, client, _ = get_client_context(need_workspace=False)
     if not client:
         return
 
@@ -80,7 +80,7 @@ def list_attachments(task_id):
 )
 def get_attachment(task_id, selector, output):
     """Download an attachment by 1-based index or filename substring"""
-    _, client, _ = get_client_context(need_team=False)
+    _, client, _ = get_client_context(need_workspace=False)
     if not client:
         return
 
@@ -133,7 +133,7 @@ def get_attachment(task_id, selector, output):
 @click.option("--name", help="Override the filename stored on ClickUp")
 def add_attachment(task_id, file_path, name):
     """Upload a file as a task attachment"""
-    _, client, _ = get_client_context(need_team=False)
+    _, client, _ = get_client_context(need_workspace=False)
     if not client:
         return
 

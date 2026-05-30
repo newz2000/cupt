@@ -9,7 +9,7 @@ Use as a library:
 
     client = ClickUpClient("pk_xxxxx")              # personal API token
     service = TaskService(client)
-    tasks = service.list_tasks(team_id="123", tags=["urgent"])
+    tasks = service.list_tasks(workspace_id="123", tags=["urgent"])
 
 Public exports are intentionally limited to the API client, services, and
 typed exceptions. Internal helpers (config, CLI commands, formatting) are
@@ -22,7 +22,7 @@ from cupt.services.note_service import NoteService
 from cupt.services.task_service import TaskService
 from cupt.services.time_service import TimeService
 
-__version__ = "0.6.2"
+__version__ = "0.7.0"
 __author__ = "Matthew Nuzum"
 __email__ = "matthew@nuzum.com"
 

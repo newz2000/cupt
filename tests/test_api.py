@@ -25,30 +25,51 @@ def test_get_user(client, mock_session):
     mock_session.get.assert_called_once()
 
 
-def test_get_teams(client, mock_session):
+def test_get_workspaces(client, mock_session):
     mock_session.get.return_value.json.return_value = {
-        "teams": [{"id": "123", "name": "Team 1"}]
+        "teams": [{"id": "123", "name": "Workspace 1"}]
     }
     mock_session.get.return_value.status_code = 200
 
-    teams = client.get_teams()
-    assert len(teams) == 1
-    assert teams[0]["name"] == "Team 1"
+    workspaces = client.get_workspaces()
+    assert len(workspaces) == 1
+    assert workspaces[0]["name"] == "Workspace 1"
 
 
-def test_get_team_tasks(client, mock_session):
+def test_get_workspace_tasks(client, mock_session):
     mock_session.get.return_value.json.return_value = {
         "tasks": [{"id": "abc", "name": "Task 1"}]
     }
     mock_session.get.return_value.status_code = 200
 
-    tasks = client.get_team_tasks("123", {"archived": "false"})
+    tasks = client.get_workspace_tasks("123", {"archived": "false"})
     assert len(tasks) == 1
     assert tasks[0]["id"] == "abc"
 
     # Verify params were passed
     args, kwargs = mock_session.get.call_args
     assert kwargs["params"]["archived"] == "false"
+
+
+def test_get_teams(client, mock_session):
+    """get_teams() returns user-groups (what the ClickUp UI calls 'teams').
+
+    The underlying REST URL is `/group` for historical reasons; the
+    `team_id` query param is the workspace ID despite the legacy name.
+    """
+    mock_session.get.return_value.json.return_value = {
+        "groups": [
+            {"id": "g1", "name": "MattTech", "members": [{"id": "u1"}]},
+            {"id": "g2", "name": "AI Agent", "members": []},
+        ]
+    }
+    mock_session.get.return_value.status_code = 200
+
+    teams = client.get_teams("workspace1")
+    assert len(teams) == 2
+    assert teams[0]["name"] == "MattTech"
+    # `team_id` is ClickUp's historical param name for the workspace ID.
+    assert mock_session.get.call_args[1]["params"] == {"team_id": "workspace1"}
 
 
 def test_get_tasks_by_ids(client, mock_session):

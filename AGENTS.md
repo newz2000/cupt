@@ -151,6 +151,28 @@ goes to **stderr**. This is what makes `cupt list --json | jq …`
 reliable. Never `click.echo` an error message to stdout, and never
 add a "helpful" banner to a `--json` code path.
 
+### Marking tasks complete: always resolve the status per task's list
+ClickUp lists carry independent status sets. One list's "closed" name
+might be `Done`; another's might be `Complete` or `Resolved`. Agents
+that hard-code a status name will silently mis-mark tasks the moment
+they hit a list with a different schema.
+
+**Canonical helper:** `TaskService.resolve_completion_status(task_id)`.
+It returns `{"target", "list_id", "list_name", "all_statuses"}` with
+no side effects. `TaskService.complete_task` is now a thin wrapper
+around it.
+
+**For agent workflows:**
+- Pre-flight a single completion with `cupt done <id> --dry-run` to
+  see the resolved status name without writing.
+- Use `cupt statuses <id>` (or `cupt statuses <list-id> --list`) to
+  inspect the full status set; the closed one is marked.
+- When iterating a multi-list `cupt list` result, call
+  `complete_task` per task — never extract a single status name and
+  reuse it across the loop.
+
+Guard: `tests/test_task_service.py::test_complete_task_resolves_per_list_not_globally`.
+
 ### Server-side tag filtering
 `TaskService.list_tasks(..., tags=[...])` pushes `tags[]` to the
 ClickUp API (OR semantics). The client-side `filter_by_tags` then

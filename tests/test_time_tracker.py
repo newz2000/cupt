@@ -33,7 +33,7 @@ def test_time_start_already_running(runner, mock_config, mock_client):
         mock_client.start_timer.assert_not_called()
 
 
-def test_start_timer_no_team_id(runner):
+def test_start_timer_no_workspace_id(runner):
     with patch(_MODULE, return_value=(None, None, None)):
         result = runner.invoke(time_group, ["start", "task1"])
         assert result.exit_code == 0
@@ -67,7 +67,7 @@ def test_time_stop_with_task_id(runner, mock_config, mock_client):
         assert "Timer stopped" in result.output
 
 
-def test_stop_timer_no_team_id(runner):
+def test_stop_timer_no_workspace_id(runner):
     with patch(_MODULE, return_value=(None, None, None)):
         result = runner.invoke(time_group, ["stop"])
         assert result.exit_code == 0
@@ -96,7 +96,7 @@ def test_time_status_running(runner, mock_config, mock_client):
         assert "abc" in result.output
 
 
-def test_timer_status_no_team_id(runner):
+def test_timer_status_no_workspace_id(runner):
     with patch(_MODULE, return_value=(None, None, None)):
         result = runner.invoke(time_group, ["status"])
         assert result.exit_code == 0
@@ -122,7 +122,7 @@ def test_time_add_success(runner, mock_config, mock_client):
         mock_client.add_time_entry.assert_called_once()
 
 
-def test_add_time_no_team_id(runner):
+def test_add_time_no_workspace_id(runner):
     with patch(_MODULE, return_value=(None, None, None)):
         result = runner.invoke(time_group, ["add", "task1", "1h"])
         assert result.exit_code == 0

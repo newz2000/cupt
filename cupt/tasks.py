@@ -52,7 +52,7 @@ def _separator_width(verbose: bool) -> int:
 @click.option("--week", is_flag=True, help="Show tasks due this week")
 @click.option("-n", "--limit", type=int, help="Limit results")
 @click.option("--verbose", is_flag=True, help="Show extra info")
-@click.option("--team-id", help="Override team ID")
+@click.option("--workspace-id", help="Override workspace ID")
 @click.option("--include-closed", is_flag=True, help="Include closed tasks")
 @click.option(
     "--mine",
@@ -60,7 +60,9 @@ def _separator_width(verbose: bool) -> int:
     default=True,
     help="Show only tasks assigned to you (default)",
 )
-@click.option("--all", "show_all", is_flag=True, help="Show tasks for the whole team")
+@click.option(
+    "--all", "show_all", is_flag=True, help="Show tasks for the whole workspace"
+)
 @click.option("--hide-subtasks", is_flag=True, help="Hide subtasks from the list")
 @click.option(
     "--offline",
@@ -80,6 +82,15 @@ def _separator_width(verbose: bool) -> int:
     help="Exclude tasks with this tag (repeatable)",
 )
 @click.option(
+    "--team",
+    "teams",
+    multiple=True,
+    help=(
+        "Only tasks assigned to this team (user-group) by name or id "
+        "(repeatable; OR semantics). Run 'cupt teams' to list available teams."
+    ),
+)
+@click.option(
     "--json",
     "as_json",
     is_flag=True,
@@ -91,7 +102,7 @@ def list_tasks_cmd(
     week,
     limit,
     verbose,
-    team_id=None,
+    workspace_id=None,
     include_closed=False,
     mine=True,
     show_all=False,
@@ -99,6 +110,7 @@ def list_tasks_cmd(
     offline=False,
     tags=(),
     no_tags=(),
+    teams=(),
     as_json=False,
 ):
     """List tasks with optional filters"""
@@ -110,13 +122,14 @@ def list_tasks_cmd(
         week,
         limit,
         verbose,
-        team_id,
+        workspace_id,
         include_closed,
         mine,
         hide_subtasks,
         offline,
         tags,
         no_tags,
+        teams,
         as_json,
     )
 
@@ -134,23 +147,26 @@ def list_tasks(
     week=False,
     limit=None,
     verbose=False,
-    team_id=None,
+    workspace_id=None,
     include_closed=False,
     mine=True,
     hide_subtasks=False,
     offline=False,
     tags=(),
     no_tags=(),
+    teams=(),
     as_json=False,
 ):
     """List and display tasks."""
-    config, client, config_team_id = get_client_context(need_team=False)
+    config, client, config_workspace_id = get_client_context(need_workspace=False)
     if not client:
         return []
 
-    active_team_id = team_id or config_team_id
-    if not active_team_id:
-        print_error("Team ID not set. Run 'cupt config --team-id <id>' first.")
+    active_workspace_id = workspace_id or config_workspace_id
+    if not active_workspace_id:
+        print_error(
+            "Workspace ID not set. Run 'cupt config --workspace-id <id>' first."
+        )
         return []
 
     user_id = config.get("user.user_id")
@@ -158,12 +174,12 @@ def list_tasks(
     try:
         if offline:
             return _list_tasks_offline(
-                config, limit, verbose, hide_subtasks, tags, no_tags, as_json
+                config, limit, verbose, hide_subtasks, tags, no_tags, teams, as_json
             )
 
         service = TaskService(client)
         tasks = service.list_tasks(
-            team_id=active_team_id,
+            workspace_id=active_workspace_id,
             user_id=user_id,
             overdue=overdue,
             today=today,
@@ -185,11 +201,14 @@ def list_tasks(
 
         tasks = _filter_by_tags(tasks, tags, no_tags)
 
+        if teams:
+            tasks = TaskService.filter_by_teams(tasks, required=list(teams))
+
         if not tasks:
             if as_json:
                 click.echo("[]")
             else:
-                print_warning("No tasks matched the tag filter.")
+                print_warning("No tasks matched the filter.")
             return []
 
         if limit:
@@ -203,12 +222,16 @@ def list_tasks(
         parent_cache = config.load_cache()
         for t in tasks:
             parent_cache[t["id"]] = t["name"]
-        service.resolve_parent_names(active_team_id, tasks, parent_cache)
+        service.resolve_parent_names(active_workspace_id, tasks, parent_cache)
         config.save_cache(parent_cache)
 
         # Silently update task cache for --offline use.
         config.save_task_cache(
-            {"tasks": tasks, "team_id": active_team_id, "timestamp": time.time()}
+            {
+                "tasks": tasks,
+                "workspace_id": active_workspace_id,
+                "timestamp": time.time(),
+            }
         )
 
         name_width = _name_column_width(verbose)
@@ -330,7 +353,14 @@ def _background_cache_tasks(client, config, tasks, timeout: float = 2.0) -> int:
 
 
 def _list_tasks_offline(
-    config, limit, verbose, hide_subtasks, tags=(), no_tags=(), as_json=False
+    config,
+    limit,
+    verbose,
+    hide_subtasks,
+    tags=(),
+    no_tags=(),
+    teams=(),
+    as_json=False,
 ):
     """Display tasks from local cache without any API calls."""
     cached = config.load_task_cache()
@@ -364,11 +394,13 @@ def _list_tasks_offline(
         tasks = [t for t in tasks if not t.get("parent")]
 
     tasks = _filter_by_tags(tasks, tags, no_tags)
+    if teams:
+        tasks = TaskService.filter_by_teams(tasks, required=list(teams))
     if not tasks:
         if as_json:
             click.echo("[]")
         else:
-            print_warning("No tasks matched the tag filter.")
+            print_warning("No tasks matched the filter.")
         return []
 
     if limit:
@@ -454,7 +486,7 @@ def show_task(
     as_json: bool = False,
 ):
     """Display full details for a single task."""
-    config, client, _ = get_client_context(need_team=False)
+    config, client, _ = get_client_context(need_workspace=False)
     if not client:
         return
 
@@ -635,22 +667,24 @@ def _show_task_offline(
 
 @click.command(name="prefetch")
 @click.option("-n", "--limit", type=int, help="Max tasks to prefetch")
-@click.option("--team-id", help="Override team ID")
-def prefetch_cmd(limit, team_id):
+@click.option("--workspace-id", help="Override workspace ID")
+def prefetch_cmd(limit, workspace_id):
     """Pre-fetch task details and notes for offline use"""
-    config, client, config_team_id = get_client_context(need_team=False)
+    config, client, config_workspace_id = get_client_context(need_workspace=False)
     if not client:
         return
 
-    active_team_id = team_id or config_team_id
-    if not active_team_id:
-        print_error("Team ID not set. Run 'cupt config --team-id <id>' first.")
+    active_workspace_id = workspace_id or config_workspace_id
+    if not active_workspace_id:
+        print_error(
+            "Workspace ID not set. Run 'cupt config --workspace-id <id>' first."
+        )
         return
 
     user_id = config.get("user.user_id")
 
     service = TaskService(client)
-    tasks = service.list_tasks(team_id=active_team_id, user_id=user_id)
+    tasks = service.list_tasks(workspace_id=active_workspace_id, user_id=user_id)
 
     if not tasks:
         print_warning("No tasks found.")
@@ -661,7 +695,11 @@ def prefetch_cmd(limit, team_id):
 
     # Update list cache while we're here.
     config.save_task_cache(
-        {"tasks": tasks, "team_id": active_team_id, "timestamp": time.time()}
+        {
+            "tasks": tasks,
+            "workspace_id": active_workspace_id,
+            "timestamp": time.time(),
+        }
     )
 
     click.echo(f"Prefetching details for {len(tasks)} tasks...")
@@ -733,28 +771,155 @@ def _prefetch_details(client, config, tasks) -> int:
     is_flag=True,
     help="Use local AI (Apple Intelligence) to suggest a completion note",
 )
-def complete_task_cmd(task_id, note, auto_note):
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help=(
+        "Resolve and print the target status without modifying the task. "
+        "Useful for agents to sanity-check before writing."
+    ),
+)
+def complete_task_cmd(task_id, note, auto_note, dry_run):
     """Mark a task as complete"""
-    return complete_task(task_id, note, auto_note)
+    return complete_task(task_id, note, auto_note, dry_run)
 
 
-def complete_task(task_id: str, note: Optional[str] = None, auto_note: bool = False):
+def complete_task(
+    task_id: str,
+    note: Optional[str] = None,
+    auto_note: bool = False,
+    dry_run: bool = False,
+):
     """Mark a task complete via TaskService."""
-    _, client, _ = get_client_context(need_team=False)
+    _, client, _ = get_client_context(need_workspace=False)
     if not client:
         return
 
     try:
+        service = TaskService(client)
+
+        if dry_run:
+            resolved = service.resolve_completion_status(task_id)
+            list_label = resolved.get("list_name") or resolved.get("list_id")
+            print_success(
+                f"Would mark task {task_id} as '{resolved['target']}' "
+                f"(list: {list_label}). No changes made."
+            )
+            return
+
         if auto_note and not note:
             note = _get_auto_note(client, task_id)
 
-        service = TaskService(client)
         target_status = service.complete_task(task_id, note)
         print_success(f"Task {task_id} marked as '{target_status}'!")
     except ValueError as e:
         print_error(str(e))
     except Exception as e:
         print_error(f"Failed to complete task: {e}")
+
+
+# ---------------------------------------------------------------------------
+# statuses
+# ---------------------------------------------------------------------------
+
+
+@click.command(name="statuses")
+@click.argument("identifier")
+@click.option(
+    "--list",
+    "is_list",
+    is_flag=True,
+    help="Treat the argument as a list ID instead of a task ID.",
+)
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Output raw status data as JSON, plus the resolved target.",
+)
+def statuses_cmd(identifier, is_list, as_json):
+    """Show status names available for a task's list.
+
+    By default the argument is a task ID and the command resolves to the
+    task's list. Use --list to pass a list ID directly. The status that
+    `cupt done` would apply is marked with an arrow.
+    """
+    return show_statuses(identifier, is_list, as_json)
+
+
+def show_statuses(identifier: str, is_list: bool = False, as_json: bool = False):
+    _, client, _ = get_client_context(need_workspace=False)
+    if not client:
+        return
+
+    try:
+        service = TaskService(client)
+
+        if is_list:
+            list_id = identifier
+            list_name: Optional[str] = None
+            statuses = client.get_list_statuses(list_id)
+            # Resolve the would-be target using the same rules done uses.
+            target = next(
+                (s["status"] for s in statuses if s.get("type") == "closed"), None
+            )
+            if not target:
+                target = next(
+                    (
+                        s["status"]
+                        for s in statuses
+                        if s.get("status", "").lower() in TaskService._DONE_NAMES
+                    ),
+                    "complete",
+                )
+        else:
+            resolved = service.resolve_completion_status(identifier)
+            list_id = resolved["list_id"]
+            list_name = resolved["list_name"]
+            statuses = resolved["all_statuses"]
+            target = resolved["target"]
+
+        if as_json:
+            import json as _json
+
+            click.echo(
+                _json.dumps(
+                    {
+                        "list_id": list_id,
+                        "list_name": list_name,
+                        "target": target,
+                        "statuses": statuses,
+                    },
+                    indent=2,
+                )
+            )
+            return
+
+        if not statuses:
+            print_warning(f"No statuses found for list {list_id}.")
+            return
+
+        label = f"{list_name} ({list_id})" if list_name else list_id
+        click.echo(f"\nList: {label}")
+        click.echo("Statuses:")
+        # Widest name for alignment.
+        name_w = max(len(s.get("status", "?")) for s in statuses)
+        for s in statuses:
+            name = s.get("status", "?")
+            stype = s.get("type", "?")
+            marker = "  ← cupt done resolves here" if name == target else ""
+            click.echo(f"  - {name:<{name_w}}  [{stype}]{marker}")
+        click.echo()
+
+    except ValueError as e:
+        print_error(str(e))
+    except Exception as e:
+        print_error(f"Failed to fetch statuses: {e}")
+
+
+# ---------------------------------------------------------------------------
+# auto-note (used by cupt done --auto-note)
+# ---------------------------------------------------------------------------
 
 
 def _get_auto_note(client, task_id: str) -> Optional[str]:
@@ -813,13 +978,13 @@ def context_cmd(task_id, show_completed):
 
 def show_context(task_id: str, show_completed: bool = False):
     """Display a task's parent, notes, and siblings/subtasks."""
-    _, client, team_id = get_client_context()
+    _, client, workspace_id = get_client_context()
     if not client:
         return
 
     try:
         service = TaskService(client)
-        ctx = service.get_task_context(task_id, team_id, show_completed)
+        ctx = service.get_task_context(task_id, workspace_id, show_completed)
         if not ctx:
             print_error(f"Task {task_id} not found")
             return

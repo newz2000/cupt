@@ -31,7 +31,7 @@ def mock_config():
     config = MagicMock()
     config.is_authenticated.return_value = True
     config.get.side_effect = lambda key, default=None: {
-        "user.team_id": "team1",
+        "user.workspace_id": "workspace1",
         "user.user_id": "user1",
         "auth.access_token": "token123",
     }.get(key, default)

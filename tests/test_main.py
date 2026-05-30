@@ -23,16 +23,16 @@ def test_config_show():
 
         result = runner.invoke(cli, ["config", "--show"])
         assert result.exit_code == 0
-        assert "Team ID: test-value" in result.output
+        assert "Workspace ID: test-value" in result.output
 
 
 def test_config_set():
     runner = CliRunner()
     with patch("cupt.main.ConfigManager") as mock_config:
         instance = mock_config.return_value
-        result = runner.invoke(cli, ["config", "--team-id", "123"])
+        result = runner.invoke(cli, ["config", "--workspace-id", "123"])
         assert result.exit_code == 0
-        instance.set.assert_called_with("user.team_id", "123")
+        instance.set.assert_called_with("user.workspace_id", "123")
 
 
 def test_status_authenticated():
@@ -42,11 +42,42 @@ def test_status_authenticated():
     ) as mock_client:
         mock_config.return_value.is_authenticated.return_value = True
         mock_client.return_value.get_user.return_value = {"user": {"username": "matt"}}
-        mock_client.return_value.get_teams.return_value = []
+        mock_client.return_value.get_workspaces.return_value = []
 
         result = runner.invoke(cli, ["status"])
         assert result.exit_code == 0
         assert "Authenticated as: matt" in result.output
+
+
+def test_teams_lists_user_groups():
+    runner = CliRunner()
+    with patch("cupt.main.ConfigManager") as mock_config, patch(
+        "cupt.main.ClickUpClient"
+    ) as mock_client:
+        mock_config.return_value.is_authenticated.return_value = True
+        mock_config.return_value.get.side_effect = lambda key, default=None: {
+            "auth.access_token": "token",
+            "user.workspace_id": "workspace1",
+        }.get(key, default)
+        mock_client.return_value.get_teams.return_value = [
+            {"id": "g1", "name": "MattTech", "members": [{"id": "u1"}, {"id": "u2"}]},
+            {"id": "g2", "name": "AI Agent", "members": []},
+        ]
+        result = runner.invoke(cli, ["teams"])
+        assert result.exit_code == 0
+        assert "MattTech" in result.output
+        assert "AI Agent" in result.output
+        assert "g1" in result.output
+        # Workspace id was resolved from config, not the CLI.
+        mock_client.return_value.get_teams.assert_called_once_with("workspace1")
+
+
+def test_teams_not_authenticated():
+    runner = CliRunner()
+    with patch("cupt.main.ConfigManager") as mock_config:
+        mock_config.return_value.is_authenticated.return_value = False
+        result = runner.invoke(cli, ["teams"])
+        assert "Not authenticated" in result.output
 
 
 def test_logout():
@@ -65,7 +96,7 @@ def test_status_not_authenticated():
         assert "Not authenticated" in result.output
 
 
-def test_status_with_team_found():
+def test_status_with_workspace_found():
     runner = CliRunner()
     with patch("cupt.main.ConfigManager") as mock_config, patch(
         "cupt.main.ClickUpClient"
@@ -73,14 +104,14 @@ def test_status_with_team_found():
         mock_config.return_value.is_authenticated.return_value = True
         mock_config.return_value.get.side_effect = lambda key, default=None: {
             "auth.access_token": "token",
-            "user.team_id": "team1",
+            "user.workspace_id": "ws1",
         }.get(key, default)
         mock_client.return_value.get_user.return_value = {"user": {"username": "matt"}}
-        mock_client.return_value.get_teams.return_value = [
-            {"id": "team1", "name": "My Team"}
+        mock_client.return_value.get_workspaces.return_value = [
+            {"id": "ws1", "name": "My Workspace"}
         ]
         result = runner.invoke(cli, ["status"])
-        assert "My Team" in result.output
+        assert "My Workspace" in result.output
 
 
 def test_status_exception():

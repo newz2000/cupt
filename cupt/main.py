@@ -21,6 +21,7 @@ from cupt.tasks import (
     list_tasks_cmd,
     prefetch_cmd,
     show_task_cmd,
+    statuses_cmd,
 )
 from cupt.time_tracker import time_group
 from cupt.utils import print_error, print_success, print_warning
@@ -92,13 +93,13 @@ def auth():
         try:
             client = ClickUpClient(api_token)
             user_info = client.get_user()
-            teams = client.get_teams()
+            workspaces = client.get_workspaces()
 
-            if teams:
-                config.set("user.team_id", teams[0]["id"])
+            if workspaces:
+                config.set("user.workspace_id", workspaces[0]["id"])
                 config.set("user.user_id", user_info["user"]["id"])
                 print_success(f"Authenticated as {user_info['user']['username']}")
-                print_success(f"Default team: {teams[0]['name']}")
+                print_success(f"Default workspace: {workspaces[0]['name']}")
 
         except Exception as e:
             print_error(f"Failed to get user info: {e}")
@@ -132,17 +133,19 @@ def auth():
             try:
                 client = ClickUpClient(tokens["access_token"])
                 user_info = client.get_user()
-                teams = client.get_teams()
+                workspaces = client.get_workspaces()
 
-                if teams:
-                    # Set first team as default
-                    config.set("user.team_id", teams[0]["id"])
+                if workspaces:
+                    # Set first workspace as default
+                    config.set("user.workspace_id", workspaces[0]["id"])
                     config.set("user.user_id", user_info["user"]["id"])
 
                     print_success(f"Authenticated as {user_info['user']['username']}")
-                    print_success(f"Default team: {teams[0]['name']}")
+                    print_success(f"Default workspace: {workspaces[0]['name']}")
                 else:
-                    print_warning("No teams found - you may need to join a workspace")
+                    print_warning(
+                        "No workspaces found - you may need to join one in ClickUp"
+                    )
 
             except Exception as e:
                 print_error(f"Failed to get user info: {e}")
@@ -170,29 +173,76 @@ def status():
     try:
         client = ClickUpClient(config.get("auth.access_token"))
         user_info = client.get_user()
-        team_id = config.get("user.team_id")
+        workspace_id = config.get("user.workspace_id")
 
-        if team_id:
-            teams = client.get_teams()
-            current_team = next((t for t in teams if t["id"] == team_id), None)
-            team_name = current_team["name"] if current_team else "Unknown"
+        if workspace_id:
+            workspaces = client.get_workspaces()
+            current_ws = next((w for w in workspaces if w["id"] == workspace_id), None)
+            workspace_name = current_ws["name"] if current_ws else "Unknown"
         else:
-            team_name = "Not set"
+            workspace_name = "Not set"
 
         print_success(f"Authenticated as: {user_info['user']['username']}")
-        print_success(f"Team: {team_name}")
+        print_success(f"Workspace: {workspace_name}")
 
     except Exception as e:
         print_error(f"Failed to get status: {e}")
 
 
 @cli.command()
-@click.option("--team-id", help="Set default team ID")
+@click.option("--workspace-id", help="Override workspace ID")
+@click.option("--json", "as_json", is_flag=True, help="Output raw team data as JSON")
+def teams(workspace_id, as_json):
+    """List ClickUp teams (user-groups) in the workspace.
+
+    Note: ClickUp calls user-groups "teams" in its UI; the underlying
+    REST URL is `/group` for historical reasons.
+    """
+    import json as _json
+
+    config = ConfigManager()
+    if not config.is_authenticated():
+        print_warning("Not authenticated. Run 'cupt auth' first.")
+        return
+
+    ws_id = workspace_id or config.get("user.workspace_id")
+    if not ws_id:
+        print_error(
+            "Workspace ID not set. Run 'cupt config --workspace-id <id>' first."
+        )
+        return
+
+    try:
+        client = ClickUpClient(config.get("auth.access_token"))
+        team_list = client.get_teams(ws_id)
+    except Exception as e:
+        print_error(f"Failed to fetch teams: {e}")
+        return
+
+    if as_json:
+        click.echo(_json.dumps(team_list, indent=2))
+        return
+
+    if not team_list:
+        print_warning("No teams found in this workspace.")
+        return
+
+    click.echo(f"\n{'ID':<14} {'Members':<8} {'Name'}")
+    click.echo("-" * 60)
+    for t in team_list:
+        tid = t.get("id", "?")
+        name = t.get("name", "?")
+        members = len(t.get("members") or [])
+        click.echo(f"{tid:<14} {members:<8} {name}")
+
+
+@cli.command()
+@click.option("--workspace-id", help="Set default workspace ID")
 @click.option("--default-list", help="Set default list ID")
 @click.option("--api-token", help="Set Personal API Token (starts with pk_)")
 @click.option("--clear-cache", is_flag=True, help="Clear persistent parent name cache")
 @click.option("--show", is_flag=True, help="Show current configuration")
-def config(team_id, default_list, api_token, clear_cache, show):
+def config(workspace_id, default_list, api_token, clear_cache, show):
     """Manage configuration"""
     config_manager = ConfigManager()
 
@@ -203,7 +253,9 @@ def config(team_id, default_list, api_token, clear_cache, show):
 
     if show:
         click.echo("Current configuration:")
-        click.echo(f"  Team ID: {config_manager.get('user.team_id', 'Not set')}")
+        click.echo(
+            f"  Workspace ID: {config_manager.get('user.workspace_id', 'Not set')}"
+        )
         click.echo(
             f"  Default List ID: {config_manager.get('user.default_list_id', 'Not set')}"
         )
@@ -224,15 +276,15 @@ def config(team_id, default_list, api_token, clear_cache, show):
         config_manager.set("auth.access_token", api_token)
         print_success("Personal API Token set")
 
-    if team_id:
-        config_manager.set("user.team_id", team_id)
-        print_success(f"Team ID set to: {team_id}")
+    if workspace_id:
+        config_manager.set("user.workspace_id", workspace_id)
+        print_success(f"Workspace ID set to: {workspace_id}")
 
     if default_list:
         config_manager.set("user.default_list_id", default_list)
         print_success(f"Default list ID set to: {default_list}")
 
-    if not team_id and not default_list and not api_token and not show:
+    if not workspace_id and not default_list and not api_token and not show:
         click.echo(click.get_current_context().get_help())
 
 
@@ -242,6 +294,7 @@ cli.add_command(show_task_cmd)
 cli.add_command(complete_task_cmd)
 cli.add_command(context_cmd)
 cli.add_command(prefetch_cmd)
+cli.add_command(statuses_cmd)
 
 cli.add_command(time_group)
 cli.add_command(tag_group)

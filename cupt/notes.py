@@ -10,7 +10,7 @@ from cupt.utils import format_date, print_error, print_success, print_warning
 @click.argument("note_text")
 def add_note(task_id, note_text):
     """Add a quick note (comment) to a task"""
-    _, client, _ = get_client_context(need_team=False)
+    _, client, _ = get_client_context(need_workspace=False)
     if not client:
         return
 
@@ -25,7 +25,7 @@ def add_note(task_id, note_text):
 @click.argument("task_id")
 def list_notes(task_id):
     """List all notes (comments) for a task"""
-    _, client, _ = get_client_context(need_team=False)
+    _, client, _ = get_client_context(need_workspace=False)
     if not client:
         return
 
