@@ -58,6 +58,11 @@ Feel free to pick or reorder sections as per your workflow.
    - ~~Cache parent task names and status lists to avoid repeated lookups.~~
 15️⃣ **Lazy loading**
    - Defer fetching of optional fields (e.g., subtasks) until needed.
+15️⃣ᵃ **Team → task mapping cache** *(post-0.7.1, only if telemetry warrants)*
+   - The 0.7.1 fix walks more pages for `--team` queries instead of stopping at 100 results, which works but adds 5–15s of latency on `--all --team` against a large workspace.
+   - Pre-walk the workspace once per session (or with a TTL), persist `{team_id: [task_id, …]}` in `~/.cupt/teams_cache.json`, then satisfy subsequent `--team` queries by looking up cached IDs and fetching only those tasks.
+   - Stale-cache risk: new tasks assigned to a team since the last walk will be missed. Need a `cupt teams --refresh` to invalidate.
+   - Don't build until real usage shows the page-walk latency is actually painful. The fast path (`--team` + `--tag`) may make this unnecessary.
  Phase 4 – Productivity Features
 16️⃣ **Auto-complete task notes**
    - Provide a `--auto-note` flag that suggests a note based on task title/description.
@@ -82,6 +87,31 @@ Feel free to pick or reorder sections as per your workflow.
    - `cupt done --dry-run` — resolve and print the target status without mutating.
    - `TaskService.resolve_completion_status(task_id)` — pure helper documented in AGENTS.md as the canonical entry point.
    - Multi-list regression: `tests/test_task_service.py::test_complete_task_resolves_per_list_not_globally` proves two tasks in lists with different closed names each get the right one.
+
+24️⃣ **`cupt work` / `cupt gtd` — sequential focused-work mode**
+   - Take a filter (`--tag ai_ready`, etc.), present one task at a time with full context, and walk through them with `[w]ork / [s]kip / [d]one / [q]uit` prompts.
+   - GTD-flavored variant: enforce a single "currently doing" task at a time; integrate with `cupt time start/stop` so timing is automatic.
+   - Open question: does this stay shell-interactive, or get a `--script <path>` mode that lets an agent drive it programmatically?
+
+25️⃣ **Quick Create** *(the one thing the agent skill currently sends users elsewhere for)*
+   - `cupt new --list <list-id> "Title"` to create a task, with optional `--description`, `--assign`, `--tag`, `--due`.
+   - `cupt sub <parent-id> "Subtask title"` for follow-up subtasks while you work.
+   - Surfaces enough of ClickUp's task-creation API to handle the common cases without forcing users to reach for MCP or curl.
+   - Update the agent skill to remove the "use the MCP for creation" redirect once this ships.
+
+26️⃣ **Workflow state / persistent session**
+   - `~/.cupt/session.yaml` tracking: currently-active task, batch in progress, last query, etc.
+   - Lets commands like `cupt done` (no arg) target the active task, or `cupt next` advance through a stored queue.
+   - Powers the `cupt work` flow above. Could also enable resumable agent runs.
+
+27️⃣ **Shell completion**
+   - `click` supports zsh/bash/fish completion natively via `_CUPT_COMPLETE`. Document the install snippet per shell.
+   - Stretch: dynamic completion of task IDs, list IDs, team names from `~/.cupt/` cache (only completes on commands that take them).
+
+28️⃣ **Saved Views support** *(server-side filter escape hatch)*
+   - `cupt list --view <view-id>` would hit `/view/{view_id}/task` and let users lean on ClickUp's UI to configure any filter the API supports (including by team-as-group, which we can't filter server-side ourselves).
+   - Helpful for the pathological case the team-filter fix can't reach: rare team tasks deep in a huge workspace.
+   - `cupt views` discovery command to list available view IDs alongside their names.
  Phase 5 – Local AI Integration *(future, needs design review first)*
    OS-level AI tools are becoming standard on both macOS and Windows. cupt is well-positioned to use them, but **before expanding this work we need to think harder about whether it's actually useful for our audience.** The current Apple-Intelligence-only `--auto-note` flag is partial Phase 5 and went largely unused; that should inform the next pass.
 
@@ -118,6 +148,29 @@ Feel free to pick or reorder sections as per your workflow.
      * Caching — policies will change rarely; cache aggressively with a manual `cupt policy refresh`.
      * Surface — is this an implicit feature (agents always see policies) or opt-in via `cupt policy show <task-id>` and a `--with-policy` flag?
    - Likely depends on the AIProvider abstraction from Phase 5, so park here until that lands.
+
+ Phase 7 – Internationalization *(v1.0 release target)*
+   The CLI's user-facing surface is small and stable enough that AI-assisted translation should produce shippable results with native-speaker review. Doing this before 1.0 means the API contract (translatable strings, message catalog format) is settled before the version commitment.
+
+29️⃣ **i18n infrastructure**
+   - Adopt Python's stdlib `gettext` with `babel`/`pybabel` for the tooling.
+   - Audit every `click.echo`, `print_*` call, every `--help` string, every error/warning message; wrap user-visible literals in `_()` markers.
+   - Generate the source `.pot` catalog. Add a `pybabel extract` invocation to the dev workflow.
+   - Add `--lang <code>` flag and a `CUPT_LANG` env var (falls back to the system locale).
+   - Library API (`ClickUpClient`, `TaskService`, etc.) returns raw data with English-language exception messages — translation is a CLI-only concern.
+
+30️⃣ **AI-assisted translation pipeline**
+   - Use a strong cloud model (Claude or GPT-class) to bootstrap translations for an initial language set — Spanish, French, German, Japanese, Brazilian Portuguese, Simplified Chinese as a starting point. The CLI strings are short and context-light, which is the sweet spot for high-quality machine translation.
+   - **Quality bar before shipping a language:** native-speaker review of the full catalog. Don't ship a half-correct translation that frustrates the audience it was meant to help.
+   - Recruit reviewers via the GitHub repo (open an issue inviting native speakers per language) before shipping `cupt` 1.0.
+   - Maintenance: every new user-facing string should trigger a translation update for shipped languages. Add a CI check that fails if `.po` files are stale relative to `.pot`.
+   - Out of scope for 1.0: RTL-language layout tweaks (the table-style output is left-to-right anyway), translated documentation (README/PLAN/AGENTS stay English-only). Revisit post-1.0 if there's demand.
+
+31️⃣ **v1.0 readiness checklist** *(deferred until 29 + 30 land plus Phase 5 design questions are resolved)*
+   - Public API stability statement (anything in `cupt/__init__.py` is now a SemVer contract).
+   - Deprecation policy documented (how long do renamed CLI flags keep an alias?).
+   - i18n shipping with at least 3 reviewed languages plus English.
+   - Phase 5 (AI) decision resolved either way — either shipped behind a clear flag, or formally removed from the roadmap so 1.0's surface is honest.
 
  Deliverables
 - Updated test suite with ≥ 80 % coverage.
