@@ -33,6 +33,26 @@ def _name_column_width(verbose: bool) -> Optional[int]:
     return max(10, width - fixed)
 
 
+def _print_team_filter_footer(service, elapsed: float, mine: bool) -> None:
+    """Show how much work the --team filter cost, and hint when truncated.
+
+    Team filtering is client-side (ClickUp has no server-side group filter),
+    so we walk extra pages to widen the candidate set. Surfacing the cost
+    keeps the latency honest, and the cap-reached hint warns the user when
+    matches may still be missing on further pages.
+    """
+    pages = getattr(service, "last_pages_walked", 0)
+    if pages <= 1:
+        return  # snappy result; no need to clutter output
+
+    page_cap = 15 if mine else 10
+    msg = f"(team filter: searched {pages} pages in {elapsed:.1f}s"
+    if pages >= page_cap:
+        msg += "; hit page cap — pair with --tag for full coverage"
+    msg += ")"
+    click.echo(msg, err=True)
+
+
 def _separator_width(verbose: bool) -> int:
     """Width of the dashed separator under the header."""
     width = get_terminal_width()
@@ -178,6 +198,8 @@ def list_tasks(
             )
 
         service = TaskService(client)
+        team_filter_active = bool(teams)
+        list_start = time.perf_counter()
         tasks = service.list_tasks(
             workspace_id=active_workspace_id,
             user_id=user_id,
@@ -187,7 +209,9 @@ def list_tasks(
             include_closed=include_closed,
             mine=mine,
             tags=list(tags) if tags else None,
+            teams_filter=team_filter_active,
         )
+        list_elapsed = time.perf_counter() - list_start
 
         if not tasks:
             if as_json:
@@ -279,6 +303,9 @@ def list_tasks(
                 )
             else:
                 click.echo(f"{task_id:<12} {status:<12} {due_date:<18} {name}")
+
+        if team_filter_active:
+            _print_team_filter_footer(service, list_elapsed, mine)
 
         # Transparently seed detail cache while the user reads the list.
         _background_cache_tasks(client, config, tasks)

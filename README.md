@@ -13,6 +13,7 @@ CUPT stands for "ClickUP Terminal," a command-line interface for accessing your 
 - **Flexible auth** — OAuth or Personal API Token.
 - **Offline support** — `cupt list` transparently caches what it just showed; `cupt show <id> --offline` works without a network. `cupt prefetch` populates the cache eagerly.
 - **JSON output everywhere** — every read command supports `--json` for piping into `jq` or feeding an agent.
+- **Agent skill bundled** — `skill/cupt-clickup/` is a portable SKILL.md that teaches Claude Code, OpenCode, Codex, and other agents how to drive cupt efficiently. See [For AI agents](#for-ai-agents) below.
 
 ## Installation
 
@@ -94,6 +95,14 @@ cupt list --team <team> --tag <tag> --mine  # stack filters freely
 ```
 
 `--mine` is on by default. Add `--all` (or omit `--mine`) to see the whole workspace.
+
+**A note on `--team` performance.** ClickUp's API has no server-side filter for teams, so `cupt` has to walk extra pages to find matches. On big workspaces this can take 5–20 seconds for `--all --team`. After the table you'll see a footer like `(team filter: searched N pages in T.Ts)` so the cost is honest. For the fastest, most reliable results on large workspaces, pair the team filter with a discriminating tag — the tag narrows server-side before the team filter runs:
+
+```bash
+cupt list --team MattTech --tag ai_ready    # near-instant, server narrows first
+```
+
+If you see `hit page cap — pair with --tag for full coverage` in the footer, that's a hint that matches may exist on pages we didn't walk.
 
 ### 5. Mark tasks complete — safely
 
@@ -203,6 +212,40 @@ Public API surface (anything importable from `cupt` top-level):
 
 Other modules (`cupt.config`, `cupt.context`, command modules) are internal to the CLI and may change between releases.
 
+## For AI agents
+
+`cupt` ships a portable agent skill (`skill/cupt-clickup/`) that teaches AI
+agents — Claude Code, OpenCode, Codex, and any other tool that supports the
+SKILL.md convention — how to use cupt efficiently. The skill is plain
+markdown with YAML frontmatter, so the same files work across agents; only
+the install path differs.
+
+Pick the line(s) that match the agent(s) you use:
+
+```bash
+# Claude Code (user-scope — available in every project)
+mkdir -p ~/.claude/skills && cp -r skill/cupt-clickup ~/.claude/skills/
+
+# Claude Code (project-scope — checked into the repo you're working in)
+mkdir -p .claude/skills && cp -r skill/cupt-clickup .claude/skills/
+
+# OpenCode (also reads from ~/.claude/skills, so the Claude install above
+# works too — these are if you prefer OpenCode's native paths)
+mkdir -p ~/.config/opencode/skills && cp -r skill/cupt-clickup ~/.config/opencode/skills/
+
+# Codex (uses its own .agents path, does NOT read .claude/skills)
+mkdir -p ~/.agents/skills && cp -r skill/cupt-clickup ~/.agents/skills/
+```
+
+The skill includes a pre-flight check (`cupt --version`, `cupt status`)
+so agents detect a missing install or unauthenticated account and prompt
+the user instead of failing silently. It does not attempt to install cupt
+itself — that's a user action.
+
+See `skill/cupt-clickup/examples.md` for the multi-step agent workflows
+the skill teaches (tagged work queues, team-scoped processing, safe
+multi-list completion, human handoff, empty-queue handling).
+
 ## A note on naming: workspace vs. team
 
 ClickUp's REST API still uses "team" for what its UI now calls "Workspace," and uses "group" for what its UI calls "Team." `cupt` follows the **current UI**:
@@ -217,7 +260,7 @@ If you're reading ClickUp's API docs and see `team_id`, that's the workspace ID.
 `cupt` is built with a focus on stability and testability.
 
 - **Coverage**: 86%
-- **Tests**: 219 unit tests using `pytest` and mocks, ~0.4s wall time.
+- **Tests**: 228 unit tests using `pytest` and mocks, ~0.3s wall time.
 
 ```bash
 pytest --cov=cupt tests/

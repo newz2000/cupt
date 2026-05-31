@@ -65,8 +65,20 @@ class TaskService:
         mine: bool = True,
         max_pages: int = 15,
         tags: Optional[List[str]] = None,
+        teams_filter: bool = False,
     ) -> List[Dict[str, Any]]:
-        """Fetch and filter tasks from the API with pagination."""
+        """Fetch and filter tasks from the API with pagination.
+
+        Args:
+            teams_filter: When True, the caller intends to apply a
+                client-side team (user-group) filter to the result. ClickUp
+                has no server-side filter for `group_assignees`, so the
+                100-task early-exit would silently truncate matches that
+                live further down the result. Setting this flag suppresses
+                the early-exit and (for `mine=False`) doubles the page cap
+                from 5 to 10. Read `last_pages_walked` after the call to
+                report search cost to the user.
+        """
         filters = self.get_filters(overdue, today, week)
 
         if mine and user_id:
@@ -80,11 +92,21 @@ class TaskService:
 
         all_tasks: List[Dict[str, Any]] = []
         page = 0
-        limit_pages = 5 if not mine else max_pages
+        pages_walked = 0
+        # `mine` queries can walk deeper because the assignee filter already
+        # narrows the server-side set. Workspace-wide (`--all`) is more
+        # expensive per page, hence the lower default cap. Team filtering
+        # gets a modest --all bump because the worst undercount we saw in
+        # benchmarks was on --all queries.
+        if not mine:
+            limit_pages = 10 if teams_filter else 5
+        else:
+            limit_pages = max_pages
 
         while page < limit_pages:
             filters["page"] = page
             tasks = self.client.get_workspace_tasks(workspace_id, filters)
+            pages_walked += 1
 
             if not tasks:
                 break
@@ -100,12 +122,22 @@ class TaskService:
             )
             all_tasks.extend(filtered)
 
-            if len(all_tasks) >= 100 or len(tasks) < 100:
+            # Without a team filter, stop once we have 100 results — the
+            # caller's other filters are server-side and any further pages
+            # are wasted API calls. With a team filter, keep walking: the
+            # team match runs after this function returns and may live on
+            # later pages.
+            if not teams_filter and len(all_tasks) >= 100:
+                break
+            if len(tasks) < 100:
                 break
             page += 1
 
+        self.last_pages_walked = pages_walked
         logger.debug(
-            "list_tasks: fetched %d tasks over %d page(s)", len(all_tasks), page + 1
+            "list_tasks: fetched %d tasks over %d page(s)",
+            len(all_tasks),
+            pages_walked,
         )
         all_tasks.sort(
             key=lambda t: (

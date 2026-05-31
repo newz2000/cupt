@@ -12,6 +12,42 @@ user impact are not listed.
 
 (nothing yet)
 
+## [0.7.1] — 2026-05-30
+
+### Changed
+- **`cupt list --team` now walks all available pages** instead of
+  stopping at the 100-task early-exit. ClickUp's API has no
+  server-side filter for team (user-group) assignments, so the
+  previous behavior silently truncated matches that lived on later
+  pages. Benchmarks against a real workspace showed `--all --team`
+  was undercounting by up to 22× for some teams. The `--mine --team`
+  path is also affected, but typically finds nothing new because
+  the assignee filter already narrows server-side.
+- The `--all` page cap is bumped from 5 to 10 when a team filter is
+  active, giving the worst case more headroom. Worst-case latency
+  is now ~15–20s on a large workspace; pair `--team` with a `--tag`
+  to keep things snappy.
+
+### Added
+- `cupt list --team` prints a quiet stderr footer showing pages
+  walked and wall time (e.g. `(team filter: searched 5 pages in
+  8.5s)`). When the page cap is hit, the footer adds a hint
+  suggesting `--tag` for full coverage.
+- `TaskService.list_tasks(..., teams_filter=True)` library parameter
+  exposes the same behavior to library callers.
+- `TaskService.last_pages_walked` instrumentation attribute for
+  callers that want to report search cost.
+
+### Docs
+- README tutorial now calls out the `--team` + `--tag` pattern as
+  the fast path for large workspaces, and explains the footer.
+- New `skill/cupt-clickup/` agent skill — portable SKILL.md + examples
+  for AI agents (Claude Code, OpenCode, Codex, etc.) that need to use
+  cupt as a token-efficient alternative to the ClickUp MCP server or
+  raw REST API. Includes a self-check that prompts the user to install
+  or authenticate cupt rather than failing silently. README documents
+  per-agent install paths.
+
 ## [0.7.0] — 2026-05-30
 
 ### Added

@@ -37,6 +37,72 @@ def test_list_tasks_filtering(service, mock_client):
     assert len(tasks) == 2
 
 
+def test_list_tasks_teams_filter_suppresses_early_exit(service, mock_client):
+    """When teams_filter=True, the 100-result early-exit is suppressed so
+    client-side team matching sees later pages. Regression for the silent
+    truncation that motivated 0.7.1."""
+    # Three pages: 100 open tasks each. Without teams_filter, current
+    # behavior stops after page 0 (cum >= 100). With teams_filter we
+    # must keep walking until pages are short or max_pages is hit.
+    page_full = [{"id": f"t{i}", "status": {"type": "open"}} for i in range(100)]
+    page_short = [{"id": "t_last", "status": {"type": "open"}}]
+    mock_client.get_workspace_tasks.side_effect = [
+        page_full,
+        page_full,
+        page_short,
+    ]
+
+    tasks = service.list_tasks("ws1", mine=False, teams_filter=True)
+
+    # Walked all three pages; would have stopped at 1 without the flag.
+    assert mock_client.get_workspace_tasks.call_count == 3
+    assert service.last_pages_walked == 3
+    assert len(tasks) == 201
+
+
+def test_list_tasks_no_teams_filter_keeps_early_exit(service, mock_client):
+    """The early-exit is preserved for the default (non-team) path so
+    plain `cupt list` doesn't suddenly become 5x more expensive."""
+    page_full = [{"id": f"t{i}", "status": {"type": "open"}} for i in range(100)]
+    mock_client.get_workspace_tasks.side_effect = [page_full, page_full]
+
+    tasks = service.list_tasks("ws1", mine=False)  # teams_filter defaults to False
+
+    assert mock_client.get_workspace_tasks.call_count == 1
+    assert service.last_pages_walked == 1
+    assert len(tasks) == 100
+
+
+def test_list_tasks_teams_filter_bumps_all_page_cap(service, mock_client):
+    """--all + --team gets max_pages=10 instead of the default 5.
+
+    Verified by handing the service 11 full pages: without the bump it
+    stops at 5; with the bump it walks 10 before hitting the cap.
+    """
+    page_full = [{"id": f"t{i}", "status": {"type": "open"}} for i in range(100)]
+    mock_client.get_workspace_tasks.side_effect = [page_full] * 11
+
+    service.list_tasks("ws1", mine=False, teams_filter=True)
+    assert mock_client.get_workspace_tasks.call_count == 10
+    assert service.last_pages_walked == 10
+
+
+def test_list_tasks_records_pages_walked(service, mock_client):
+    """`last_pages_walked` is the per-call instrumentation the CLI uses
+    for the footer. Must reflect *this* call, not a previous one."""
+    mock_client.get_workspace_tasks.side_effect = [
+        [{"id": "t1", "status": {"type": "open"}}],  # short page → stop
+    ]
+    service.list_tasks("ws1")
+    assert service.last_pages_walked == 1
+
+    mock_client.get_workspace_tasks.reset_mock()
+    page = [{"id": f"t{i}", "status": {"type": "open"}} for i in range(100)]
+    mock_client.get_workspace_tasks.side_effect = [page, page[:50]]
+    service.list_tasks("ws1", teams_filter=True)
+    assert service.last_pages_walked == 2
+
+
 def test_list_tasks_passes_tags_to_api(service, mock_client):
     """tags= argument is forwarded as ClickUp's tags[] filter (server-side OR)."""
     mock_client.get_workspace_tasks.return_value = []

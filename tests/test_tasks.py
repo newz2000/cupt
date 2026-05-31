@@ -208,6 +208,101 @@ def test_list_tasks_filter_by_team(runner, mock_config, mock_client):
         assert "AI Agent Work" not in result.output
 
 
+def test_list_tasks_team_footer_appears_when_pages_walked(
+    runner, mock_config, mock_client
+):
+    """The team-filter footer surfaces the cost of walking extra pages.
+
+    Only prints when more than one page was walked — a single-page result
+    is fast and the footer would just be noise.
+    """
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        page_full = [
+            {
+                "id": f"t{i}",
+                "name": f"Task {i}",
+                "status": {"status": "open", "type": "open"},
+                "group_assignees": (
+                    [{"id": "g1", "name": "MattTech"}] if i == 0 else []
+                ),
+            }
+            for i in range(100)
+        ]
+        # Second page is short so the walk terminates after page 1.
+        mock_client.get_workspace_tasks.side_effect = [page_full, page_full[:5]]
+        result = runner.invoke(list_tasks_cmd, ["--team", "MattTech"])
+        assert result.exit_code == 0
+        # Footer goes to stderr so it doesn't contaminate piped output.
+        assert "team filter: searched 2 pages" in result.stderr
+
+
+def test_list_tasks_team_footer_silent_when_one_page(runner, mock_config, mock_client):
+    """No footer for a single-page result (would be pure noise)."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_workspace_tasks.return_value = [
+            {
+                "id": "t1",
+                "name": "MattTech Work",
+                "status": {"status": "open", "type": "open"},
+                "group_assignees": [{"id": "g1", "name": "MattTech"}],
+            }
+        ]
+        result = runner.invoke(list_tasks_cmd, ["--team", "MattTech"])
+        assert result.exit_code == 0
+        assert "team filter:" not in result.stderr
+
+
+def test_list_tasks_no_team_no_footer(runner, mock_config, mock_client):
+    """Footer is gated on --team; plain `cupt list` never shows it."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_workspace_tasks.return_value = [
+            {
+                "id": "t1",
+                "name": "Task",
+                "status": {"status": "open", "type": "open"},
+            }
+        ]
+        result = runner.invoke(list_tasks_cmd, [])
+        assert result.exit_code == 0
+        assert "team filter:" not in result.stderr
+
+
+def test_list_tasks_team_passes_filter_flag_to_service(
+    runner, mock_config, mock_client
+):
+    """--team triggers `teams_filter=True` on the service call so the
+    early-exit and page cap get the team-aware behavior."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ), patch("cupt.tasks.TaskService") as svc_cls:
+        svc = svc_cls.return_value
+        svc.list_tasks.return_value = []
+        svc.last_pages_walked = 1
+        runner.invoke(list_tasks_cmd, ["--team", "MattTech"])
+        _, kwargs = svc.list_tasks.call_args
+        assert kwargs["teams_filter"] is True
+
+
+def test_list_tasks_no_team_does_not_set_filter_flag(runner, mock_config, mock_client):
+    """Default path keeps teams_filter=False so plain queries don't pay
+    the extra-pagination cost."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ), patch("cupt.tasks.TaskService") as svc_cls:
+        svc = svc_cls.return_value
+        svc.list_tasks.return_value = []
+        svc.last_pages_walked = 1
+        runner.invoke(list_tasks_cmd, [])
+        _, kwargs = svc.list_tasks.call_args
+        assert kwargs["teams_filter"] is False
+
+
 def test_list_tasks_team_stacks_with_tag(runner, mock_config, mock_client):
     """--team and --tag stack: task must match both."""
     with patch(
