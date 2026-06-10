@@ -10,7 +10,32 @@ user impact are not listed.
 
 ## [Unreleased]
 
-(nothing yet)
+### Added
+- **Short IDs in interactive sessions.** `cupt list` now prints a `#`
+  column with Taskwarrior-style stable integers (1, 2, 3…) for each
+  "my pending" task. Any command that takes a task ID accepts the
+  short form: `cupt show 3`, `cupt note 3 "..."`, `cupt done 3`.
+  Numbers are reconciled on each unfiltered list (filtered lists
+  like `--today` are additive only) and freed when a task is closed.
+- **Active task pointer.** `cupt start <id>` marks a task as active
+  for the session; `cupt note`, `cupt done`, `cupt show`, `cupt
+  context`, `cupt notes`, and `cupt time start` / `time add` fall
+  back to it when no ID is given. `cupt done` clears it on success;
+  `cupt stop` clears it without closing the task. `cupt active`
+  shows the current pointer.
+- **`--interactive` / `--no-interactive` global flag** and
+  `CUPT_INTERACTIVE=1|0` env var to force the mode (default: enabled
+  when stdout is a TTY).
+
+### Changed
+- Both stateful features are hidden in non-interactive use (piped
+  output, `CI=true`, `--no-interactive`). Scripts always get the
+  classic stateless behavior — short IDs and the active pointer are
+  never consulted, and pure-integer args pass through to the API
+  rather than silently resolving to a short ID.
+- `cupt note` now accepts a single positional argument (the note
+  text) when an active task is set. The two-arg form
+  (`cupt note <id> <text>`) still works.
 
 ## [0.7.1] — 2026-05-30
 

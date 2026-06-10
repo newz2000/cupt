@@ -8,6 +8,7 @@ import sys
 import click
 
 from cupt import __version__
+from cupt.active import active_cmd, start_cmd, stop_cmd
 from cupt.api import ClickUpClient
 from cupt.attachments import attach_group
 from cupt.auth import OAuthManager
@@ -24,7 +25,21 @@ from cupt.tasks import (
     statuses_cmd,
 )
 from cupt.time_tracker import time_group
-from cupt.utils import print_error, print_success, print_warning
+from cupt.utils import (
+    print_error,
+    print_success,
+    print_warning,
+    set_interactive_override,
+)
+
+
+def _set_interactive_callback(ctx, param, value):
+    """Translate --interactive / --no-interactive into the global override."""
+    if value is True:
+        set_interactive_override(True)
+    elif value is False:
+        set_interactive_override(False)
+    return value
 
 
 @click.group()
@@ -42,6 +57,17 @@ from cupt.utils import print_error, print_success, print_warning
         )
         if val
         else None
+    ),
+)
+@click.option(
+    "--interactive/--no-interactive",
+    default=None,
+    is_eager=True,
+    expose_value=False,
+    callback=_set_interactive_callback,
+    help=(
+        "Force interactive (short IDs + active task) or non-interactive mode. "
+        "Default: enabled when stdout is a TTY."
     ),
 )
 def cli():
@@ -303,6 +329,10 @@ cli.add_command(attach_group)
 cli.add_command(add_note)
 cli.add_command(list_notes)
 cli.add_command(summary_cmd)
+
+cli.add_command(start_cmd)
+cli.add_command(stop_cmd)
+cli.add_command(active_cmd)
 
 if __name__ == "__main__":
     cli()

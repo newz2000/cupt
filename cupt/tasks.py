@@ -6,11 +6,14 @@ from typing import Optional
 import click
 
 from cupt.context import get_client_context
+from cupt.resolver import IDResolutionError, resolve_task_id
 from cupt.services.task_service import TaskService
+from cupt.state import StateManager
 from cupt.utils import (
     format_date,
     format_duration,
     get_terminal_width,
+    is_interactive,
     print_error,
     print_success,
     print_warning,
@@ -22,14 +25,18 @@ from cupt.utils import (
 # Verbose adds " {assignee:<18} {est:<8} {tracked:<8}" -> +18+1+8+1+8+1 = 37
 _LIST_FIXED_WIDTH = 45
 _LIST_FIXED_WIDTH_VERBOSE = 82
+# Short-ID column ("#") prefixed in interactive sessions: "{#:<4} " -> 5
+_SHORT_ID_COLUMN_WIDTH = 5
 
 
-def _name_column_width(verbose: bool) -> Optional[int]:
+def _name_column_width(verbose: bool, with_short: bool = False) -> Optional[int]:
     """Available columns for the name field, or None when output isn't a TTY."""
     width = get_terminal_width()
     if width is None:
         return None
     fixed = _LIST_FIXED_WIDTH_VERBOSE if verbose else _LIST_FIXED_WIDTH
+    if with_short:
+        fixed += _SHORT_ID_COLUMN_WIDTH
     return max(10, width - fixed)
 
 
@@ -59,6 +66,93 @@ def _separator_width(verbose: bool) -> int:
     if width is not None:
         return width
     return 140 if verbose else 120
+
+
+def _render_task_list(
+    tasks,
+    verbose: bool,
+    parent_cache,
+    short_map=None,
+) -> None:
+    """Print the task table. ``short_map`` (clickup_id → short str) prepends a
+    ``[N]`` column when present; ``None`` matches the legacy script-friendly
+    output."""
+    with_short = short_map is not None
+    name_width = _name_column_width(verbose, with_short=with_short)
+
+    short_header = f"{'#':<4} " if with_short else ""
+    if verbose:
+        click.echo(
+            f"\n{short_header}"
+            f"{'ID':<12} {'Status':<12} {'Due':<18} {'Assignee':<18} "
+            f"{'Est':<8} {'Tracked':<8} {'Name'}"
+        )
+    else:
+        click.echo(
+            f"\n{short_header}{'ID':<12} {'Status':<12} {'Due':<18} {'Name'}"
+        )
+    click.echo("-" * _separator_width(verbose))
+
+    for task in tasks:
+        task_id = task.get("id", "No ID")
+        status = task.get("status", {}).get("status", "unknown")
+        due_date = format_date(task.get("due_date"))
+        name = task.get("name", "No name")
+        p_id = task.get("parent")
+
+        if p_id:
+            p_name = parent_cache.get(p_id, p_id)
+            name = f"↳ {name} (sub of {p_name})"
+
+        name = truncate_text(name, name_width)
+
+        short_cell = ""
+        if with_short:
+            short = short_map.get(task_id, "")
+            short_cell = f"{short:<4} "
+
+        if verbose:
+            individuals = [a.get("username", "?") for a in task.get("assignees", [])]
+            team_chips = [
+                f"[{g.get('name', '?')}]" for g in task.get("group_assignees", [])
+            ]
+            assignee = ", ".join(individuals + team_chips) or "-"
+            est = (
+                format_duration(task.get("time_estimate") or 0)
+                if task.get("time_estimate")
+                else "-"
+            )
+            tracked = (
+                format_duration(int(task.get("time_spent") or 0))
+                if task.get("time_spent")
+                else "-"
+            )
+            click.echo(
+                f"{short_cell}{task_id:<12} {status:<12} {due_date:<18} "
+                f"{assignee:<18} {est:<8} {tracked:<8} {name}"
+            )
+        else:
+            click.echo(
+                f"{short_cell}{task_id:<12} {status:<12} {due_date:<18} {name}"
+            )
+
+
+def _print_active_footer(state: StateManager) -> None:
+    """One-line reminder of what `cupt start` set and how stale the list is.
+
+    Mitigates the "wrong terminal" mistake — every list ends with a clear
+    statement of which task subsequent commands would mutate.
+    """
+    active = state.get_active()
+    last = state.last_reconcile()
+    if active:
+        short = state.short_id_for(active["clickup_id"])
+        prefix = f"[{short}] " if short else ""
+        click.echo(
+            f"\nActive: {prefix}{active['clickup_id']} — {active.get('name', '')}"
+        )
+    elif last:
+        click.echo(f"\nNo active task. Last list refresh: {last}")
 
 
 # ---------------------------------------------------------------------------
@@ -258,54 +352,23 @@ def list_tasks(
             }
         )
 
-        name_width = _name_column_width(verbose)
-        if verbose:
-            click.echo(
-                f"\n{'ID':<12} {'Status':<12} {'Due':<18} {'Assignee':<18} {'Est':<8} {'Tracked':<8} {'Name'}"
-            )
-        else:
-            click.echo(f"\n{'ID':<12} {'Status':<12} {'Due':<18} {'Name'}")
-        click.echo("-" * _separator_width(verbose))
+        # Short-ID reconciliation runs only for interactive "my pending" lists.
+        # A full sync (free + assign) requires the result to actually be the
+        # full pending set — filtered views (today/overdue/week) only add IDs.
+        short_map = None
+        state: Optional[StateManager] = None
+        if is_interactive() and mine and not as_json:
+            state = StateManager()
+            full_sync = not (overdue or today or week)
+            short_map = state.reconcile(tasks, full_sync=full_sync)
 
-        for task in tasks:
-            task_id = task.get("id", "No ID")
-            status = task.get("status", {}).get("status", "unknown")
-            due_date = format_date(task.get("due_date"))
-            name = task.get("name", "No name")
-            p_id = task.get("parent")
-
-            if p_id:
-                p_name = parent_cache.get(p_id, p_id)
-                name = f"↳ {name} (sub of {p_name})"
-
-            name = truncate_text(name, name_width)
-
-            if verbose:
-                individuals = [
-                    a.get("username", "?") for a in task.get("assignees", [])
-                ]
-                teams = [
-                    f"[{g.get('name', '?')}]" for g in task.get("group_assignees", [])
-                ]
-                assignee = ", ".join(individuals + teams) or "-"
-                est = (
-                    format_duration(task.get("time_estimate") or 0)
-                    if task.get("time_estimate")
-                    else "-"
-                )
-                tracked = (
-                    format_duration(int(task.get("time_spent") or 0))
-                    if task.get("time_spent")
-                    else "-"
-                )
-                click.echo(
-                    f"{task_id:<12} {status:<12} {due_date:<18} {assignee:<18} {est:<8} {tracked:<8} {name}"
-                )
-            else:
-                click.echo(f"{task_id:<12} {status:<12} {due_date:<18} {name}")
+        _render_task_list(tasks, verbose, parent_cache, short_map=short_map)
 
         if team_filter_active:
             _print_team_filter_footer(service, list_elapsed, mine)
+
+        if state is not None:
+            _print_active_footer(state)
 
         # Transparently seed detail cache while the user reads the list.
         _background_cache_tasks(client, config, tasks)
@@ -437,47 +500,18 @@ def _list_tasks_offline(
         click.echo(json.dumps(tasks, indent=2))
         return tasks
 
-    name_width = _name_column_width(verbose)
-    if verbose:
-        click.echo(
-            f"\n{'ID':<12} {'Status':<12} {'Due':<18} {'Assignee':<18} {'Est':<8} {'Tracked':<8} {'Name'}"
-        )
-    else:
-        click.echo(f"\n{'ID':<12} {'Status':<12} {'Due':<18} {'Name'}")
-    click.echo("-" * _separator_width(verbose))
+    # Offline mode reuses the already-tracked short IDs (no reconciliation —
+    # we have no fresh API data to know which IDs should be freed).
+    short_map = None
+    state: Optional[StateManager] = None
+    if is_interactive():
+        state = StateManager()
+        short_map = state.short_id_map()
 
-    for task in tasks:
-        task_id = task.get("id", "No ID")
-        status = task.get("status", {}).get("status", "unknown")
-        due_date = format_date(task.get("due_date"))
-        name = task.get("name", "No name")
-        p_id = task.get("parent")
+    _render_task_list(tasks, verbose, parent_cache, short_map=short_map)
 
-        if p_id:
-            p_name = parent_cache.get(p_id, p_id)
-            name = f"↳ {name} (sub of {p_name})"
-
-        name = truncate_text(name, name_width)
-
-        if verbose:
-            individuals = [a.get("username", "?") for a in task.get("assignees", [])]
-            teams = [f"[{g.get('name', '?')}]" for g in task.get("group_assignees", [])]
-            assignee = ", ".join(individuals + teams) or "-"
-            est = (
-                format_duration(task.get("time_estimate") or 0)
-                if task.get("time_estimate")
-                else "-"
-            )
-            tracked = (
-                format_duration(int(task.get("time_spent") or 0))
-                if task.get("time_spent")
-                else "-"
-            )
-            click.echo(
-                f"{task_id:<12} {status:<12} {due_date:<18} {assignee:<18} {est:<8} {tracked:<8} {name}"
-            )
-        else:
-            click.echo(f"{task_id:<12} {status:<12} {due_date:<18} {name}")
+    if state is not None:
+        _print_active_footer(state)
 
     return tasks
 
@@ -488,7 +522,7 @@ def _list_tasks_offline(
 
 
 @click.command(name="show")
-@click.argument("task_id")
+@click.argument("task_id", required=False)
 @click.option("--notes", is_flag=True, help="Show task notes")
 @click.option(
     "--offline",
@@ -502,7 +536,12 @@ def _list_tasks_offline(
     help="Output raw task data as JSON (always includes parent + comments)",
 )
 def show_task_cmd(task_id, notes, offline, as_json):
-    """Show detailed task information"""
+    """Show detailed task information. Falls back to the active task."""
+    try:
+        task_id = resolve_task_id(task_id)
+    except IDResolutionError as e:
+        print_error(str(e))
+        return
     return show_task(task_id, notes, offline, as_json)
 
 
@@ -791,7 +830,7 @@ def _prefetch_details(client, config, tasks) -> int:
 
 
 @click.command(name="done")
-@click.argument("task_id")
+@click.argument("task_id", required=False)
 @click.option("--note", help="Add a completion note")
 @click.option(
     "--auto-note",
@@ -807,7 +846,12 @@ def _prefetch_details(client, config, tasks) -> int:
     ),
 )
 def complete_task_cmd(task_id, note, auto_note, dry_run):
-    """Mark a task as complete"""
+    """Mark a task as complete. Falls back to the active task."""
+    try:
+        task_id = resolve_task_id(task_id)
+    except IDResolutionError as e:
+        print_error(str(e))
+        return
     return complete_task(task_id, note, auto_note, dry_run)
 
 
@@ -839,6 +883,14 @@ def complete_task(
 
         target_status = service.complete_task(task_id, note)
         print_success(f"Task {task_id} marked as '{target_status}'!")
+
+        # Closing the task ends the "I'm working on this" session. Free the
+        # short ID so the next reconcile slot opens up immediately, and
+        # clear the active pointer only if it was this task.
+        if is_interactive():
+            state = StateManager()
+            state.free_short_for(task_id)
+            state.clear_active(only_if_id=task_id)
     except ValueError as e:
         print_error(str(e))
     except Exception as e:
@@ -996,10 +1048,15 @@ def _get_auto_note(client, task_id: str) -> Optional[str]:
 
 
 @click.command(name="context")
-@click.argument("task_id")
+@click.argument("task_id", required=False)
 @click.option("--show-completed", is_flag=True, help="Include completed subtasks")
 def context_cmd(task_id, show_completed):
-    """Show task context (parent, siblings, subtasks)"""
+    """Show task context (parent, siblings, subtasks). Falls back to active task."""
+    try:
+        task_id = resolve_task_id(task_id)
+    except IDResolutionError as e:
+        print_error(str(e))
+        return
     return show_context(task_id, show_completed)
 
 

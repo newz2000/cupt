@@ -3,6 +3,7 @@ from datetime import datetime
 import click
 
 from cupt.context import get_client_context
+from cupt.resolver import IDResolutionError, resolve_task_id
 from cupt.services.time_service import TimeService
 from cupt.utils import (
     format_duration,
@@ -20,9 +21,15 @@ def time_group():
 
 
 @time_group.command("start")
-@click.argument("task_id")
+@click.argument("task_id", required=False)
 def start_timer(task_id):
-    """Start time tracking for a task"""
+    """Start time tracking for a task. Falls back to the active task."""
+    try:
+        task_id = resolve_task_id(task_id)
+    except IDResolutionError as e:
+        print_error(str(e))
+        return
+
     _, client, workspace_id = get_client_context()
     if not client:
         return
@@ -84,11 +91,31 @@ def timer_status():
 
 
 @time_group.command("add")
-@click.argument("task_id")
-@click.argument("duration")
+@click.argument("args", nargs=-1, required=True)
 @click.option("-m", "--message", help="Description for the time entry")
-def add_time(task_id, duration, message):
-    """Add manual time entry to a task"""
+def add_time(args, message):
+    """Add manual time entry to a task.
+
+    Forms:
+
+    \b
+      cupt time add <task_id> <duration>   # explicit
+      cupt time add <duration>             # uses active task (interactive)
+    """
+    if len(args) == 2:
+        task_id_arg, duration = args
+    elif len(args) == 1:
+        task_id_arg, duration = None, args[0]
+    else:
+        print_error("Usage: cupt time add [<task_id>] <duration>")
+        return
+
+    try:
+        task_id = resolve_task_id(task_id_arg)
+    except IDResolutionError as e:
+        print_error(str(e))
+        return
+
     _, client, workspace_id = get_client_context()
     if not client:
         return

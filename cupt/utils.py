@@ -5,6 +5,7 @@ Not part of the public library API — these may change between releases.
 Library users should not import from this module.
 """
 
+import os
 import re
 import shutil
 import sys
@@ -149,6 +150,45 @@ def print_success(message: str):
 def print_warning(message: str):
     """Print warning message to stderr."""
     print(_decorate("⚠️", "WARN", message), file=sys.stderr)
+
+
+_INTERACTIVE_OVERRIDE: Optional[bool] = None
+
+
+def set_interactive_override(value: Optional[bool]) -> None:
+    """Force interactivity mode (used by top-level --interactive / --no-interactive)."""
+    global _INTERACTIVE_OVERRIDE
+    _INTERACTIVE_OVERRIDE = value
+
+
+def is_interactive(stream=None) -> bool:
+    """
+    True iff cupt should expose stateful UX (short IDs, active task).
+
+    Resolution order:
+      1. CLI override set via ``set_interactive_override``
+      2. ``CUPT_INTERACTIVE`` env (``1`` / ``0``)
+      3. ``CI=true`` forces non-interactive
+      4. Default: ``stream.isatty()`` (``sys.stdout`` if not given)
+
+    Scripts that pipe cupt output (``cupt list | grep ...``) automatically get
+    non-interactive behavior so they cannot accidentally consume stateful UX.
+    """
+    if _INTERACTIVE_OVERRIDE is not None:
+        return _INTERACTIVE_OVERRIDE
+    env = os.environ.get("CUPT_INTERACTIVE")
+    if env == "1":
+        return True
+    if env == "0":
+        return False
+    if os.environ.get("CI", "").lower() in ("1", "true"):
+        return False
+    if stream is None:
+        stream = sys.stdout
+    try:
+        return stream.isatty()
+    except (AttributeError, ValueError):
+        return False
 
 
 def format_task_status(status: str) -> str:
