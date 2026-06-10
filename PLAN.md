@@ -1,188 +1,255 @@
-Overview
-1. Test‑centric stability – add comprehensive unit & integration tests covering API interactions, services, and CLI commands.
-2. Code cleanup & refactor – improve readability, type hints, error handling, and modularity.
-3. Performance tuning – target measurable gains for critical paths (e.g., task listing, time‑entry operations).
-4. Enhanced productivity features – add productivity‑driven enhancements once core stability is achieved.
-Below is a detailed, step‑by‑step plan (in Markdown).
-Feel free to pick or reorder sections as per your workflow.
- Cupt Project Roadmap
- Phase 1 – Stabilization (Tests & Core Fixes)
-1️⃣ **Determine coverage target**
-   - Aim for ≥ 80 % line/branch coverage in core modules (`api`, `services/`, `tasks`, `auth`).
-2️⃣ **Implement missing test coverage**
-   - [ ] **api.py**
-     * Create mocks for GET/POST/PUT/DELETE → test error handling and JSON parsing.
-     * Verify proper header inclusion.
-   - [ ] **auth.py (OAuth flow)**
-     * Mock HTTP server interactions (`OAuthCallbackHandler`).
-     * Test token exchange, refresh, logout.
-   - [ ] **services/task_service.py**
-     * Verify task‑listing filters, pagination, closed‑status resolution.
-     * Mock ClickUpClient for task fetching.
-   - [ ] **services/timer_service.py**
-     * Test `start_timer`, `stop_timer`, `add_time_entry` logic.
-   - [ ] **cli commands**
-     * Use `click.testing.CliRunner` to assert command outputs and error handling.
-3️⃣ **Regression test matrix**
-   - Run existing `tests/` and new tests with `pytest --cov` and ensure failures are reproducible.
-4️⃣ **Add test harness**
-   - Create a `tests/conftest.py` for shared fixtures (mocked ClickUpClient, test config loader).
-5️⃣ **CI configuration**
-   - Draft a CI pipeline (GitHub Actions) that runs tests, lints (flake8/black), and builds the package.
-6️⃣ **Document testing strategy**
-   - Update `README.md` with a "Testing" section (how to run tests, interpret coverage).
- Phase 2 – Code Refactor & Cleanup
-7️⃣ **Improve type hints and imports**
-   - Add `typing` annotations for all public functions.
-   - Remove unused imports.
-8️⃣ **Centralize configuration**
-   - `ConfigManager` exposes `get`, `set`, and `load_cache`. Refactor to use a schema‑driven approach (pydantic or dataclasses).
-9️⃣ **Error handling**
-   - Introduce custom exceptions (`APIError`, `AuthError`).
-   - Replace generic `Exception` in `api._make_request`.
-🔟 **Logging**
-   - Add a logger (`logging.getLogger(__name__)`) instead of `print_*` utilities.
-1️⃣1️⃣ **Code formatting**
-   - Apply `black` and `isort` uniformly.
-1️⃣2️⃣ **Modularize CLI commands**
-   - Split `tasks.py` into separate modules (`list_cmd.py`, `show_cmd.py`, `done_cmd.py`).
-1️⃣3️⃣ **Refactor service classes**
-   - Make `TaskService`, `TimerService`, `NoteService` each a small, focused class.
- Phase 3 – Performance Enhancements
-12️⃣ **Profile critical paths**
-   - Use `cProfile` or `timeit` on `TaskService.list_tasks`.
-   - Identify bottlenecks: repeated API calls, JSON deserialization, cache misses.
-13️⃣ **Batch API usage**
-   - For bulk task fetching, leverage `get_tasks_by_ids` with pagination.
-14️⃣ ~~**Client‑side caching**~~  ✅
-   - ~~Cache parent task names and status lists to avoid repeated lookups.~~
-15️⃣ **Lazy loading**
-   - Defer fetching of optional fields (e.g., subtasks) until needed.
-15️⃣ᵃ **Team → task mapping cache** *(post-0.7.1, only if telemetry warrants)*
-   - The 0.7.1 fix walks more pages for `--team` queries instead of stopping at 100 results, which works but adds 5–15s of latency on `--all --team` against a large workspace.
-   - Pre-walk the workspace once per session (or with a TTL), persist `{team_id: [task_id, …]}` in `~/.cupt/teams_cache.json`, then satisfy subsequent `--team` queries by looking up cached IDs and fetching only those tasks.
-   - Stale-cache risk: new tasks assigned to a team since the last walk will be missed. Need a `cupt teams --refresh` to invalidate.
-   - Don't build until real usage shows the page-walk latency is actually painful. The fast path (`--team` + `--tag`) may make this unnecessary.
- Phase 4 – Productivity Features
-16️⃣ **Auto-complete task notes**
-   - Provide a `--auto-note` flag that suggests a note based on task title/description.
-   - *AI enhancement candidate — see Phase 5.*
-17️⃣ **Daily summary**
-   - CLI command `cupt summary` that aggregates tasks due today, time logged, and closed tasks.
-   - Defaults to `--mine` (same as `cupt list`); accepts `--all` to show team-wide.
-   - API calls run concurrently: today's tasks, overdue tasks, running timer, time entries for the day, tasks closed today.
-   - *AI enhancement candidate — see Phase 5.*
-18️⃣ **Time-tracking shortcuts**
-   - Add `start <task-id>`, `stop`, `add <hours>`, and `report`.
-19️⃣ **Offline support** *(investigate)*
-   - Explore caching the full task list locally so read-only commands (`list`, `show`, `context`) work without a network connection.
-   - Consider a TTL-based cache refresh strategy and a `--offline` flag to force local data.
-19️⃣ᵃ **Team filter for `cupt list`** ✅ *(shipped 2026-05-30; renamed to match ClickUp UI in same window)*
-   - ClickUp distinguishes the **workspace** (`--workspace-id`, previously `--team-id`) from **teams** (user-groups within the workspace, e.g. "MattTech", "AI Agent"). Teams show up on tasks as `group_assignees` in the JSON.
-   - `cupt list --team <name|id>` (repeatable, OR semantics) stacks cleanly with `--tag`, `--no-tag`, `--mine`/`--all`, and the date filters.
-   - `cupt teams` lists `id`, `name`, and member count for the workspace.
-   - Filter runs client-side by walking `task.group_assignees[].id` (ClickUp's filter API doesn't expose team assignees server-side, so result quality depends on pagination — combine with `--all` if a team's tasks are rare).
-20️⃣ᵃ **Per-list status discovery and "mark complete" normalization** ✅ *(shipped 2026-05-30)*
-   - `cupt statuses <task-id>` (or `--list <list-id>`) — print all statuses available for a list, with the one `cupt done` would apply marked. Supports `--json`.
-   - `cupt done --dry-run` — resolve and print the target status without mutating.
-   - `TaskService.resolve_completion_status(task_id)` — pure helper documented in AGENTS.md as the canonical entry point.
-   - Multi-list regression: `tests/test_task_service.py::test_complete_task_resolves_per_list_not_globally` proves two tasks in lists with different closed names each get the right one.
+# Cupt Roadmap to v1.0
 
-24️⃣ **`cupt work` / `cupt gtd` — sequential focused-work mode**
-   - Take a filter (`--tag ai_ready`, etc.), present one task at a time with full context, and walk through them with `[w]ork / [s]kip / [d]one / [q]uit` prompts.
-   - GTD-flavored variant: enforce a single "currently doing" task at a time; integrate with `cupt time start/stop` so timing is automatic.
-   - Open question: does this stay shell-interactive, or get a `--script <path>` mode that lets an agent drive it programmatically?
+## Target audience
 
-25️⃣ **Quick Create** ✅ *(shipped 2026-06-09 in v0.8.0)*
-   - `cupt add "Title"` — captures into the active task's list (or `user.default_list_id`) with you as assignee.
-   - `--parent <id|short|this>` / `--blocks <id|short|this>` for relationships; `this` resolves to the active task.
-   - `--description`, `--due` (today/tomorrow/+Nd/YYYY-MM-DD/epoch ms), `--tag` (repeatable), `--json`.
-   - `ClickUpClient.create_task` and `ClickUpClient.add_task_dependency` exposed as library methods.
-   - Agent skill (`skill/cupt-clickup/SKILL.md`) updated to drop the "use MCP for creation" redirect.
+Everything on this roadmap should serve one of two users. Features that
+don't aren't on the path to 1.0.
 
-26️⃣ **Workflow state / persistent session** ✅ *(shipped 2026-06-09 in v0.8.0)*
-   - `~/.cupt/state.json` tracking the active task and Taskwarrior-style short IDs.
-   - `cupt start <id>` sets active; subsequent `note`/`done`/`show`/`context`/`notes`/`time start`/`time add` default to it; `cupt done` clears it; `cupt stop` clears without closing; `cupt active` reads.
-   - Short IDs (`#` column in `cupt list`) reconcile on unfiltered `--mine` lists and are additive on filtered views. Freed on done.
-   - Both features auto-hide when stdout is a pipe / `CI=true` / `--no-interactive` / `CUPT_INTERACTIVE=0` — agents and scripts keep their stateless contract.
-   - Open follow-ups: `cupt next` queue advancement (still future); `cupt work` (item 24️⃣) can now layer on top of this state.
+1. **Solo finisher** — wants to work down their todo list and close
+   tasks fast, with minimal context-switching. Lives in the terminal.
+   The win is fewer keystrokes between "what's next" and "done."
+2. **AI agent (and the team using it)** — drives cupt to coordinate with
+   the humans on the team. The win is a stable, scriptable contract:
+   predictable JSON, predictable exit codes, no interactive prompts when
+   stdout isn't a TTY.
 
-27️⃣ **Shell completion**
-   - `click` supports zsh/bash/fish completion natively via `_CUPT_COMPLETE`. Document the install snippet per shell.
-   - Stretch: dynamic completion of task IDs, list IDs, team names from `~/.cupt/` cache (only completes on commands that take them).
+## v1.0 readiness criteria
 
-28️⃣ **Saved Views support** *(server-side filter escape hatch)*
-   - `cupt list --view <view-id>` would hit `/view/{view_id}/task` and let users lean on ClickUp's UI to configure any filter the API supports (including by team-as-group, which we can't filter server-side ourselves).
-   - Helpful for the pathological case the team-filter fix can't reach: rare team tasks deep in a huge workspace.
-   - `cupt views` discovery command to list available view IDs alongside their names.
- Phase 5 – Local AI Integration *(future, needs design review first)*
-   OS-level AI tools are becoming standard on both macOS and Windows. cupt is well-positioned to use them, but **before expanding this work we need to think harder about whether it's actually useful for our audience.** The current Apple-Intelligence-only `--auto-note` flag is partial Phase 5 and went largely unused; that should inform the next pass.
+1. **Stable public API.** Anything in `cupt/__init__.py` and every
+   documented CLI flag is a SemVer contract. Deprecation policy
+   documented.
+2. **Stable agent contract.** Every read command's `--json` output is
+   schema-documented; exit codes are documented; non-interactive mode
+   is exercised in CI.
+3. **Solo focus mode shipped** (`cupt work` / `cupt gtd`, item below).
+4. **Test coverage ≥ 80 %** in `api`, `services/`, `tasks`, `auth`.
+5. **i18n infrastructure in place** with at least one non-English
+   language available (rough pass; quality polish can continue
+   post-1.0). See section E.
+6. **`--auto-note` removed** unless user research surfaces real demand
+   between now and the next release. See section F.
+7. **README + AGENTS.md** reflect the shipped surface.
 
-   **Open design questions to resolve before writing more code:**
-   - Who is this for? `cupt` users skew toward power-users / engineers / agent-driven workflows. Do they actually want AI-drafted notes, or do they want raw data they can pipe into their own tooling (which already works via `--json`)?
-   - What does "good" look like? A completion-note suggestion has to clear a quality bar — a generic "Completed the task as described" is worse than no suggestion. How do we measure that?
-   - Where is the friction worst? `cupt summary --ai` might be more valuable than `cupt done --auto-note` because the summary involves more synthesis. Worth prototyping before committing to an abstraction.
-   - Backend story: is local-only the right constraint? Cloud AI (Claude, OpenAI) gives much better output but adds privacy/cost considerations that change who the audience is.
-   - Should it stay in core, or live in a separate `cupt-ai` plugin so the base CLI stays lean?
+Anything labeled *(deferred)* below is explicitly out of scope for 1.0.
+We can ship it post-1.0 without breaking the SemVer promise as long as
+we don't add it to the public API surface first.
 
-20️⃣ **AI backend abstraction** *(blocked on design review above)*
-   - Introduce an optional `AIProvider` interface in `cupt/ai.py` with a single `complete(prompt) -> str` method.
-   - Candidate backends (priority TBD):
-     1. **Ollama** — query `http://localhost:11434` (cross-platform, developer-friendly)
-     2. **Apple Intelligence / MLX** — already partially shipped via `apple-fm-sdk`; needs to be folded into the abstraction
-     3. **Windows Copilot** — invoke via WinRT `Microsoft.Windows.AI` APIs (Windows 11)
-     4. **Claude API** — fallback if an `ANTHROPIC_API_KEY` env var is set
-   - If no backend is available, features that require AI are silently skipped or show a friendly hint.
-
-21️⃣ **AI-enhanced `--auto-note`** *(partial: Apple Intelligence works today; blocked on design review for broader rollout)*
-   - Already implemented for `apple-fm-sdk`. Pulls task title, description, and recent comments; presents suggestion with `[a]ccept / [e]dit / [s]kip`.
-   - Not declared as a dependency or surfaced in the README — see design-review notes above before changing that.
-
-22️⃣ **AI-enhanced `cupt summary`** *(not started)*
-   - After assembling the raw summary data, optionally pass it to the AI backend for a one-paragraph plain-English callout.
-   - Example output: "You have 2 overdue items — the client inquiry from Monday looks most urgent. You've tracked 3h 45m today, slightly under your usual pace."
-   - Controlled by a `--ai` flag so it's opt-in; raw summary always shown first.
- Phase 6 – Pie in the Sky *(future, after Phase 5)*
-23️⃣ **Policy ingestion from ClickUp documents**
-   - Idea: when processing a task, look up the list or folder it lives in and check whether a designated document (e.g., one tagged `policy` or named `AGENT_POLICY.md`) lives there. If found, pull its contents and feed them to the agent as system-level guidance before it acts on the task.
-   - Open questions to resolve before implementing:
-     * Discovery rule — naming convention vs. tag vs. explicit pointer in folder metadata?
-     * Scope — does a folder-level policy override a list-level one? How are conflicts resolved?
-     * Caching — policies will change rarely; cache aggressively with a manual `cupt policy refresh`.
-     * Surface — is this an implicit feature (agents always see policies) or opt-in via `cupt policy show <task-id>` and a `--with-policy` flag?
-   - Likely depends on the AIProvider abstraction from Phase 5, so park here until that lands.
-
- Phase 7 – Internationalization *(v1.0 release target)*
-   The CLI's user-facing surface is small and stable enough that AI-assisted translation should produce shippable results with native-speaker review. Doing this before 1.0 means the API contract (translatable strings, message catalog format) is settled before the version commitment.
-
-29️⃣ **i18n infrastructure**
-   - Adopt Python's stdlib `gettext` with `babel`/`pybabel` for the tooling.
-   - Audit every `click.echo`, `print_*` call, every `--help` string, every error/warning message; wrap user-visible literals in `_()` markers.
-   - Generate the source `.pot` catalog. Add a `pybabel extract` invocation to the dev workflow.
-   - Add `--lang <code>` flag and a `CUPT_LANG` env var (falls back to the system locale).
-   - Library API (`ClickUpClient`, `TaskService`, etc.) returns raw data with English-language exception messages — translation is a CLI-only concern.
-
-30️⃣ **AI-assisted translation pipeline**
-   - Use a strong cloud model (Claude or GPT-class) to bootstrap translations for an initial language set — Spanish, French, German, Japanese, Brazilian Portuguese, Simplified Chinese as a starting point. The CLI strings are short and context-light, which is the sweet spot for high-quality machine translation.
-   - **Quality bar before shipping a language:** native-speaker review of the full catalog. Don't ship a half-correct translation that frustrates the audience it was meant to help.
-   - Recruit reviewers via the GitHub repo (open an issue inviting native speakers per language) before shipping `cupt` 1.0.
-   - Maintenance: every new user-facing string should trigger a translation update for shipped languages. Add a CI check that fails if `.po` files are stale relative to `.pot`.
-   - Out of scope for 1.0: RTL-language layout tweaks (the table-style output is left-to-right anyway), translated documentation (README/PLAN/AGENTS stay English-only). Revisit post-1.0 if there's demand.
-
-31️⃣ **v1.0 readiness checklist** *(deferred until 29 + 30 land plus Phase 5 design questions are resolved)*
-   - Public API stability statement (anything in `cupt/__init__.py` is now a SemVer contract).
-   - Deprecation policy documented (how long do renamed CLI flags keep an alias?).
-   - i18n shipping with at least 3 reviewed languages plus English.
-   - Phase 5 (AI) decision resolved either way — either shipped behind a clear flag, or formally removed from the roadmap so 1.0's surface is honest.
-
- Deliverables
-- Updated test suite with ≥ 80 % coverage.
-- Clean, type‑annotated, well‑logged code.
-- Performance‑instrumented CLI with optional `--profile` flag.
-- README updates (overview, installation, testing, usage).
 ---
- Next Steps to Begin
-1. **Create test skeletons** (e.g., `tests/test_api_client.py`).
-2. **Set up a local virtualenv** with `pip install -e .` (deps declared in `pyproject.toml`).
-3. **Run `pytest --cov`** to get baseline coverage.
-4. **Iteratively add mocks and assertions** as outlined.
+
+## Already shipped (reference, not work)
+
+These are the load-bearing capabilities the rest of the plan assumes
+exist. Listed so we don't accidentally re-plan them.
+
+- **Quick capture** — `cupt add "Title"` with `--parent this` /
+  `--blocks this`, due-date parsing, tag support, `--json`. (v0.8.0)
+- **Workflow state** — `~/.cupt/state.json`, active task pointer
+  (`cupt start` / `stop` / `active`), Taskwarrior-style `#` short IDs
+  in `cupt list`. Auto-hides for pipes / `CI=true` / `--no-interactive`.
+  (v0.8.0)
+- **Team filter** — `cupt list --team <name|id>` stacks with
+  `--tag` / `--mine` / `--all` / date filters. `cupt teams` discovery.
+  (v0.7.0)
+- **Per-list status resolution** — `cupt done` picks the right closed
+  status per task's list; `cupt statuses <id>` shows options;
+  `cupt done --dry-run` previews. (v0.7.0)
+- **Client-side caching** — parent task names and status lists.
+- **Offline read path** — `cupt list` caches what it showed;
+  `cupt show <id> --offline` and `cupt prefetch`.
+
+---
+
+## v1.0 work
+
+### A. Stability — tests, lint, CI
+
+Non-negotiable for the SemVer promise. Most of this is mechanical.
+
+- [ ] **Coverage to ≥ 80 %** in `api`, `services/`, `tasks`, `auth`.
+  Existing test layout is fine; fill the gaps.
+  * `api.py` — mock GET/POST/PUT/DELETE, error paths, header inclusion.
+  * `auth.py` — mock `OAuthCallbackHandler`, token exchange, refresh,
+    logout.
+  * `services/task_service.py` — filters, pagination, closed-status
+    resolution (multi-list regression already exists).
+  * `services/timer_service.py` — start, stop, add manual entry.
+  * `cli` — `click.testing.CliRunner` for every command's happy path
+    and one error case.
+- [ ] **Shared fixtures** in `tests/conftest.py` (mocked
+  `ClickUpClient`, test config loader).
+- [ ] **CI pipeline** (GitHub Actions): `pytest --cov`, `flake8` /
+  `black --check`, build wheel + sdist. Fail the build below coverage
+  target.
+- [ ] **Custom exceptions** (`APIError`, `AuthError`) replacing generic
+  `Exception` in `api._make_request`. Stable exit-code mapping in CLI
+  layer — agents consume these.
+- [ ] **Logging via `logging.getLogger(__name__)`** replacing ad-hoc
+  `print_*` utilities. `--verbose` / `--quiet` already exist; route
+  through the logger.
+- [ ] **`black` + `isort`** uniform pass; add to CI.
+- [ ] **Type hints on public functions** in `cupt/__init__.py` exports
+  and service classes. Not asking for strict mypy — just enough that
+  the SemVer surface is legible.
+
+### B. Solo finisher — close the loop
+
+The minimum that makes "work down my list" feel obviously better than
+the alternative.
+
+- [ ] **`cupt work` — sequential focus mode.** Take a filter
+  (`--tag ai_ready`, etc.), present one task at a time with full
+  context, walk through with `[w]ork / [s]kip / [d]one / [q]uit`.
+  Integrates with `cupt time start/stop` so timing is automatic. Sits
+  on top of the v0.8.0 active-task state — `[w]ork` is just `cupt start`
+  under the hood.
+  * GTD-flavored: enforce a single active task at a time.
+  * Open question still: shell-interactive only, or also `--script
+    <path>` to let an agent drive it? Default: shell-only for 1.0; the
+    agent already has `cupt start` + `cupt done` to script the same
+    flow.
+- [ ] **Shell completion.** `click` supports zsh/bash/fish via
+  `_CUPT_COMPLETE`. Document the install snippet per shell in README.
+  * Stretch (only if cheap): dynamic completion of task IDs / team
+    names from `~/.cupt/` cache.
+- [ ] **`cupt summary` — daily summary.** Aggregate today's tasks,
+  overdue, running timer, time entries for the day, tasks closed today.
+  Defaults to `--mine`; `--all` for team-wide. API calls run
+  concurrently. `--json` is mandatory (agents consume this too).
+
+### C. Agent contract — make the scripting contract explicit
+
+The agent skill already exists; this is about making the surface it
+relies on durable.
+
+- [ ] **JSON schemas documented** for every read command's `--json`
+  output. Living doc in `AGENTS.md` or a `docs/json-schemas.md`.
+  Schemas are tested — a snapshot test catches accidental breakage.
+- [ ] **Exit code table documented.** 0 success, 1 generic failure, 2
+  auth failure, 3 not found, etc. — pick the mapping, write it down,
+  test it.
+- [ ] **`--no-interactive` exercised in CI.** Run the full CLI surface
+  with `CUPT_INTERACTIVE=0` and assert no command prompts, no short-ID
+  resolution, no active-task fallback.
+- [ ] **Agent skill maintenance.** When commands change, update
+  `skill/cupt-clickup/SKILL.md` in the same PR. Add a CI check that
+  fails if the skill file references commands that don't exist.
+
+### D. Internationalization — rough pass
+
+The CLI surface is small and stable enough that an AI-bootstrapped pass
+should land us a shippable v1.0 baseline. Doing this *before* 1.0 means
+the catalog format and the wrapping convention are part of the SemVer
+contract — adding strings post-1.0 stays cheap; switching frameworks
+later wouldn't be.
+
+- [ ] **gettext + babel/pybabel** wired into the dev workflow. Add
+  `pybabel extract` to the release checklist.
+- [ ] **Audit and wrap** every `click.echo`, `print_*`, `--help`
+  string, error message in `_()` markers. The library API
+  (`ClickUpClient`, `TaskService`, raised exceptions) stays English —
+  translation is a CLI-only concern.
+- [ ] **`--lang <code>` flag and `CUPT_LANG` env var**, falling back to
+  the system locale. Document in README.
+- [ ] **Generate `.pot` source catalog**, commit it to the repo.
+- [ ] **AI-bootstrap one language end-to-end** as the proof point.
+  Spanish is the obvious pick (largest non-English audience overlap with
+  the terminal/developer crowd). Quality bar: the strings shouldn't
+  embarrass us, but native-speaker review can land after 1.0 — open a
+  GitHub issue inviting reviewers when we tag.
+- [ ] **CI check**: fail the build if `.po` files are stale relative to
+  `.pot`. Stops new English strings from silently breaking
+  translations.
+
+Out of scope for 1.0: RTL layout tweaks (table output is LTR anyway),
+translated README/AGENTS/CHANGELOG, more than one shipped language
+beyond English. All of those can come after 1.0 without breaking the
+infrastructure contract.
+
+### E. `--auto-note` — back out unless users speak up
+
+**Status: leaning remove.** The current implementation is small,
+mostly self-contained (`cupt/ai.py` + `_get_auto_note` in
+`cupt/tasks.py`), and was always documented as partial. Removing it
+makes 1.0's surface honest — we're not promising "AI features" we
+don't believe in.
+
+**How it works today, plainly:**
+
+1. Reads the task name, description (first 400 chars), and the last 3
+   comments.
+2. Asks Apple Intelligence (`apple-fm-sdk`, on-device, macOS 26+) to
+   write *"a brief, professional one-sentence completion note."*
+3. Presents the suggestion with `[a]ccept / [e]dit / [s]kip`.
+
+The suggestion has no signal of *what the user actually did* — it's a
+restatement of the task description in past tense. That's why it feels
+like magic: it is, in the bad sense. "Call the client back" becomes
+"Called the client back as requested" regardless of whether the call
+happened or what was said.
+
+**Gate before removing:**
+
+- Ask on Reddit at the next release whether anyone uses `--auto-note`.
+- If real users speak up, keep it and revisit the design.
+- If they don't (the expected outcome), remove the flag, drop the
+  `apple-fm-sdk` optional dep, delete `cupt/ai.py` and `_get_auto_note`.
+
+**Reframe for later (not 1.0):** evidence-based completion notes.
+Instead of paraphrasing the task description, surface signals from work
+that actually happened — git commits referencing the task ID, time
+entries logged today, recent file changes in a linked repo. That's a
+fresh feature with a real input, not a tweak to this one. Park it.
+
+### F. Performance — only what shows up in real use
+
+- [ ] **Profile `TaskService.list_tasks`** once with `cProfile` against
+  a realistic workspace. Don't pre-optimize.
+- [ ] **Lazy loading** for optional fields (subtasks) on `show` /
+  `context` paths.
+- [ ] **Team → task mapping cache** *(only if telemetry warrants)* —
+  the 0.7.1 page-walk adds 5-15s on `--all --team` against large
+  workspaces. Pre-walk once per session with TTL, persist
+  `{team_id: [task_id, …]}` in `~/.cupt/teams_cache.json`,
+  `cupt teams --refresh` to invalidate. Don't build until the
+  page-walk latency is actually painful in practice.
+
+---
+
+## Deferred past v1.0
+
+Removed from the critical path. Listed so we don't forget the thinking,
+not as commitments.
+
+### Saved Views support
+`cupt list --view <view-id>` hitting `/view/{view_id}/task` — server-
+side filter escape hatch for cases the team-filter walk can't reach.
+Useful, but not load-bearing for either audience. Park.
+
+### Local AI integration (was Phase 5)
+
+Cut from the v1.0 critical path. The thinking:
+
+- The agent audience **is** the AI. cupt being a thin, fast, scriptable
+  pipe (`--json`) is the right primitive for them — they don't want
+  cupt to also pick an LLM backend.
+- The one local-AI feature we shipped (`--auto-note`) is in section F
+  above with a leaning-remove recommendation.
+- A `cupt summary --ai` callout might be the one place AI synthesis
+  beats raw data, but that's a post-1.0 experiment, not a 1.0 promise.
+
+If a `cupt-ai` plugin makes sense post-1.0, it lives outside core.
+
+### Policy ingestion from ClickUp documents (was Phase 6)
+Interesting for the agent audience — list/folder-scoped policies that
+agents see before acting. But it depends on a stable agent contract
+(item C above) being in place first, and the design questions
+(discovery rule, scope/override, caching, opt-in vs implicit) are
+unresolved. Park until post-1.0.
+
+### Misc deferred
+- Configuration via pydantic/dataclasses schema — current
+  `ConfigManager` works fine; refactor only if the type-hint pass
+  surfaces real pain.
+- Splitting `tasks.py` into per-command modules — cosmetic; defer.
+- `--profile` flag exposing `cProfile` output — useful for us, not for
+  users; keep as a dev-only ad-hoc.
