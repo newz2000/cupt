@@ -101,12 +101,47 @@ cupt note <id> "Your comment"
 cupt notes <id>              # list all comments
 ```
 
+## Create a task
+
+```bash
+cupt add "Task name" --list <list-id> --json    # canonical form for agents
+cupt add "Subtask"  --list <list-id> --parent <id>
+cupt add "Blocker"  --list <list-id> --blocks <id>
+cupt add "Has metadata" --list <list-id> \
+  -d "description" --due tomorrow --tag urgent --json
+```
+
+`--list` is **required** for agent / non-interactive callers — the
+active-task convenience that lets human users omit it is hidden when stdout
+is a pipe. Pass `--json` to receive the created task back as a parseable
+payload (use `id` and `url` for follow-up calls).
+
+`--due` accepts `today`, `tomorrow`, `+Nd` / `+Nw` / `+Nh`, `YYYY-MM-DD`,
+`YYYY-MM-DD HH:MM`, or raw epoch ms — the last form is the safest for
+machine-generated dates.
+
+`--blocks <id>` creates a ClickUp dependency edge: the given task ends up
+depending on the new one. If the workspace doesn't allow dependencies the
+task is still created; cupt prints a warning to stderr but does not fail.
+
+## Interactive-only features (inert for agents)
+
+cupt 0.8 adds two features for human users that **never activate** when
+stdout is piped, when `CI=true`, when `--no-interactive` is passed, or
+when `CUPT_INTERACTIVE=0` is set:
+
+- Short integer IDs (the `#` column in `cupt list`).
+- Active-task fallback (typing `cupt note "..."` without an ID).
+
+Agents should always pass full ClickUp IDs. A pure-integer argument
+(e.g. `cupt show 3`) in non-interactive mode is passed straight to the
+ClickUp API rather than resolved as a short ID, which will surface as a
+404 — so agent code is never silently bound to a human's local state file.
+
 ## Gotchas
 
 - ClickUp's REST API uses `team_id` to mean workspace ID; cupt translates
   this. If you read ClickUp's API docs directly, remember the rename.
-- cupt does **not** create tasks. Use the ClickUp MCP server or the REST API
-  (`POST /list/{list_id}/task`) for task creation.
 - An empty result is a valid outcome, not an error. Before escalating to the
   user: check tag spelling (`cupt list --json | jq '.[] | .tags[].name' | sort -u`),
   try `--all`, verify team name with `cupt teams`. If the queue is genuinely

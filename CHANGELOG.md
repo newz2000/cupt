@@ -10,6 +10,10 @@ user impact are not listed.
 
 ## [Unreleased]
 
+(nothing yet)
+
+## [0.8.0] — 2026-06-09
+
 ### Added
 - **Short IDs in interactive sessions.** `cupt list` now prints a `#`
   column with Taskwarrior-style stable integers (1, 2, 3…) for each
@@ -36,6 +40,25 @@ user impact are not listed.
 - `cupt note` now accepts a single positional argument (the note
   text) when an active task is set. The two-arg form
   (`cupt note <id> <text>`) still works.
+
+### Added (capture)
+- **`cupt add "task name"`** — low-friction quick capture during
+  work. Defaults in interactive sessions: list inferred from the
+  active task (falls back to `user.default_list_id`), assignee is
+  you, no relationship to anything else.
+- `--blocks <id|short-id|this>` and `--parent <id|short-id|this>`
+  flags. The `this` sentinel resolves to the active task; an
+  explicit ID (or short ID like `3`) links to that task. `--blocks`
+  uses ClickUp's dependency API; the create still succeeds even if
+  the dependency call fails (e.g. workspace doesn't have
+  dependencies enabled) — a warning is printed.
+- `--description`, `--due`, `--tag` (repeatable), `--json`. Due-date
+  accepts `today`, `tomorrow`, `+Nd` / `+Nw` / `+Nh`, `YYYY-MM-DD`,
+  `YYYY-MM-DD HH:MM`, or raw epoch ms (so agent callers can pass
+  timestamps without formatting).
+- `ClickUpClient.create_task(list_id, data)` and
+  `ClickUpClient.add_task_dependency(task_id, depends_on)` library
+  methods.
 
 ## [0.7.1] — 2026-05-30
 

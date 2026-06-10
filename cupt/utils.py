@@ -70,6 +70,74 @@ def format_duration(milliseconds: int) -> str:
         return f"{minutes}m"
 
 
+def parse_due_date(value: Optional[str]) -> Optional[int]:
+    """Parse a due-date string to ClickUp's epoch-ms format.
+
+    Accepted forms:
+
+    \b
+      today                 — end of today, local time
+      tomorrow              — end of tomorrow, local time
+      +Nd / +Nw / +Nh       — N days / weeks / hours from now
+      YYYY-MM-DD            — that date at end of day, local time
+      YYYY-MM-DD HH:MM      — that date and time, local time
+      <integer>             — raw epoch ms (passthrough for callers like Hermes)
+
+    Returns None if ``value`` is None or empty. Raises ValueError on unparseable
+    input so the caller can surface a clear message instead of silently dropping
+    the due date.
+    """
+    if value is None or value == "":
+        return None
+
+    text = value.strip().lower()
+    now = datetime.now()
+
+    if text == "today":
+        end_of_day = now.replace(hour=23, minute=59, second=0, microsecond=0)
+        return int(end_of_day.timestamp() * 1000)
+
+    if text == "tomorrow":
+        from datetime import timedelta
+
+        end_of_tomorrow = (now + timedelta(days=1)).replace(
+            hour=23, minute=59, second=0, microsecond=0
+        )
+        return int(end_of_tomorrow.timestamp() * 1000)
+
+    relative = re.match(r"^\+(\d+)([dwh])$", text)
+    if relative:
+        from datetime import timedelta
+
+        n = int(relative.group(1))
+        unit = relative.group(2)
+        delta = {
+            "d": timedelta(days=n),
+            "w": timedelta(weeks=n),
+            "h": timedelta(hours=n),
+        }[unit]
+        return int((now + delta).timestamp() * 1000)
+
+    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            dt = datetime.strptime(value.strip(), fmt)
+            # Date-only forms default to end of day, matching `today` / `tomorrow`.
+            if fmt == "%Y-%m-%d":
+                dt = dt.replace(hour=23, minute=59)
+            return int(dt.timestamp() * 1000)
+        except ValueError:
+            continue
+
+    # Raw integer (epoch ms) — passthrough for tool callers.
+    if text.isdigit():
+        return int(text)
+
+    raise ValueError(
+        f"Could not parse due date '{value}'. "
+        "Try YYYY-MM-DD, today, tomorrow, or +Nd / +Nw / +Nh."
+    )
+
+
 def format_date(timestamp: Optional[Any]) -> str:
     """Format timestamp to readable date"""
     if not timestamp:

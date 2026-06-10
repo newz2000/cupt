@@ -9,6 +9,7 @@ import click
 
 from cupt import __version__
 from cupt.active import active_cmd, start_cmd, stop_cmd
+from cupt.add import add_cmd
 from cupt.api import ClickUpClient
 from cupt.attachments import attach_group
 from cupt.auth import OAuthManager
@@ -333,6 +334,7 @@ cli.add_command(summary_cmd)
 cli.add_command(start_cmd)
 cli.add_command(stop_cmd)
 cli.add_command(active_cmd)
+cli.add_command(add_cmd)
 
 if __name__ == "__main__":
     cli()

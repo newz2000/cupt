@@ -158,6 +158,21 @@ class ClickUpClient:
     def update_task(self, task_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         return self._make_request("PUT", f"/task/{task_id}", data=data)
 
+    def create_task(self, list_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """POST /list/{list_id}/task — create a task in the given list."""
+        return self._make_request("POST", f"/list/{list_id}/task", data=data)
+
+    def add_task_dependency(
+        self, task_id: str, depends_on: str
+    ) -> Dict[str, Any]:
+        """Make ``task_id`` blocked by ``depends_on`` (i.e. ``depends_on`` must
+        complete before ``task_id`` can)."""
+        return self._make_request(
+            "POST",
+            f"/task/{task_id}/dependency",
+            data={"depends_on": depends_on},
+        )
+
     def add_task_tag(self, task_id: str, tag_name: str) -> Dict[str, Any]:
         return self._make_request("POST", f"/task/{task_id}/tag/{tag_name}")
 

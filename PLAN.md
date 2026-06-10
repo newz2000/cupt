@@ -93,16 +93,19 @@ Feel free to pick or reorder sections as per your workflow.
    - GTD-flavored variant: enforce a single "currently doing" task at a time; integrate with `cupt time start/stop` so timing is automatic.
    - Open question: does this stay shell-interactive, or get a `--script <path>` mode that lets an agent drive it programmatically?
 
-25️⃣ **Quick Create** *(the one thing the agent skill currently sends users elsewhere for)*
-   - `cupt new --list <list-id> "Title"` to create a task, with optional `--description`, `--assign`, `--tag`, `--due`.
-   - `cupt sub <parent-id> "Subtask title"` for follow-up subtasks while you work.
-   - Surfaces enough of ClickUp's task-creation API to handle the common cases without forcing users to reach for MCP or curl.
-   - Update the agent skill to remove the "use the MCP for creation" redirect once this ships.
+25️⃣ **Quick Create** ✅ *(shipped 2026-06-09 in v0.8.0)*
+   - `cupt add "Title"` — captures into the active task's list (or `user.default_list_id`) with you as assignee.
+   - `--parent <id|short|this>` / `--blocks <id|short|this>` for relationships; `this` resolves to the active task.
+   - `--description`, `--due` (today/tomorrow/+Nd/YYYY-MM-DD/epoch ms), `--tag` (repeatable), `--json`.
+   - `ClickUpClient.create_task` and `ClickUpClient.add_task_dependency` exposed as library methods.
+   - Agent skill (`skill/cupt-clickup/SKILL.md`) updated to drop the "use MCP for creation" redirect.
 
-26️⃣ **Workflow state / persistent session**
-   - `~/.cupt/session.yaml` tracking: currently-active task, batch in progress, last query, etc.
-   - Lets commands like `cupt done` (no arg) target the active task, or `cupt next` advance through a stored queue.
-   - Powers the `cupt work` flow above. Could also enable resumable agent runs.
+26️⃣ **Workflow state / persistent session** ✅ *(shipped 2026-06-09 in v0.8.0)*
+   - `~/.cupt/state.json` tracking the active task and Taskwarrior-style short IDs.
+   - `cupt start <id>` sets active; subsequent `note`/`done`/`show`/`context`/`notes`/`time start`/`time add` default to it; `cupt done` clears it; `cupt stop` clears without closing; `cupt active` reads.
+   - Short IDs (`#` column in `cupt list`) reconcile on unfiltered `--mine` lists and are additive on filtered views. Freed on done.
+   - Both features auto-hide when stdout is a pipe / `CI=true` / `--no-interactive` / `CUPT_INTERACTIVE=0` — agents and scripts keep their stateless contract.
+   - Open follow-ups: `cupt next` queue advancement (still future); `cupt work` (item 24️⃣) can now layer on top of this state.
 
 27️⃣ **Shell completion**
    - `click` supports zsh/bash/fish completion natively via `_CUPT_COMPLETE`. Document the install snippet per shell.

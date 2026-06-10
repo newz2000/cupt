@@ -7,6 +7,8 @@ CUPT stands for "ClickUP Terminal," a command-line interface for accessing your 
 - **Tag and team filters** — `cupt list --tag ai_ready --team MattTech` scopes to exactly what you're working on.
 - **Hierarchical context** — `cupt context <id>` shows a task's parent and siblings.
 - **Status-aware completion** — `cupt done` resolves the correct "closed" status per task's list automatically; `--dry-run` lets you preview before writing.
+- **Stateful interactive UX** — `cupt list` shows a stable `#` column (1, 2, 3…) you can type instead of long ClickUp IDs. `cupt start <id>` sets a session active task so subsequent commands (`note`, `done`, `show`, `time start`) don't need an ID. Both features auto-hide when stdout is a pipe, so scripts and agents keep their stateless behavior.
+- **Quick capture** — `cupt add "task name"` creates a new task in the active task's list (or your default list). `--parent this` / `--blocks this` link it to whatever you're working on.
 - **Time tracking** — start/stop timers and add manual entries.
 - **Notes** — quick comments and a list view per task.
 - **Attachments** — list, download, and upload files on tasks.
@@ -78,7 +80,47 @@ cupt show <task-id> --notes     # also include all comments
 cupt context <task-id>          # parent + siblings/subtasks
 ```
 
-### 4. Filter by tag and by team
+### 4. Work through your day without retyping IDs
+
+In an interactive terminal `cupt list` shows a `#` column with stable short IDs (1, 2, 3…) you can use anywhere a task ID is expected:
+
+```
+#    ID           Status       Due                Name
+-----------------------------------------------------------------
+1    868abc       open         2026-06-09 17:00   Fix login bug
+2    868def       open         2026-06-10 17:00   Review onboarding doc
+3    868ghi       open         —                  Reply to client
+```
+
+These numbers stay stable across sessions until the underlying task is closed (or moves out of your pending list). `cupt show 2`, `cupt note 2 "..."`, `cupt done 2` all work.
+
+When you pick a task to focus on, mark it active:
+
+```bash
+cupt start 1                      # or `cupt start 868abc`
+# every subsequent command falls back to this task when no ID is given:
+cupt note "made progress on the auth flow"
+cupt time start                   # optional — start a timer for it
+cupt show                         # re-read the description without retyping
+cupt done --note "shipping it"    # closes the task and clears active
+```
+
+`cupt active` shows the current active task; `cupt stop` clears it without closing the task (use this when you get interrupted). Every `cupt list` ends with a one-line footer reminding you what's active, so you can spot "wrong terminal" mistakes before they happen.
+
+Mid-task you'll often realize a new task needs to exist. `cupt add` captures it without leaving the terminal:
+
+```bash
+cupt add "Migrate the legacy auth tokens"               # lands in the active task's list
+cupt add "Subtask of what I'm doing" --parent this      # subtask of active
+cupt add "Have to do this first" --blocks this          # active task now depends on this one
+cupt add "Reply to legal" --due tomorrow --tag urgent   # with metadata
+```
+
+Pass an explicit ID instead of `this` (`--parent 868xyz` or `--parent 2`) to link to a different task. Without `--parent` or `--blocks`, the new task is a peer — no relationship — so capture stays fast when you just want to write something down.
+
+**Hidden in scripts.** Short IDs, the active-task fallback, and the list footer all disappear when stdout is a pipe (or when `CUPT_INTERACTIVE=0` / `--no-interactive` is set). `cupt list | grep ...`, `cupt show abc --json`, and an agent calling `cupt add "..." --list <id> --json` all behave the way they did in 0.7.x — stateless and predictable.
+
+### 5. Filter by tag and by team
 
 ClickUp tags (`ai_ready`, `urgent`, `waiting`, etc.) and *teams* (what ClickUp calls user-groups in its UI, e.g. `MattTech`, `AI Agent`) are how you carve a busy workspace into something workable.
 
@@ -104,7 +146,7 @@ cupt list --team MattTech --tag ai_ready    # near-instant, server narrows first
 
 If you see `hit page cap — pair with --tag for full coverage` in the footer, that's a hint that matches may exist on pages we didn't walk.
 
-### 5. Mark tasks complete — safely
+### 6. Mark tasks complete — safely
 
 Different ClickUp lists carry different status names (one uses `Done`, another `Complete`, another `Resolved`). `cupt done` figures out the right one per task's list automatically. If you want to double-check before writing:
 
@@ -116,7 +158,7 @@ cupt done <task-id>               # do it
 cupt done <task-id> --note "Shipped behind the AI_v2 flag"
 ```
 
-### 6. Track time, take notes, attach files
+### 7. Track time, take notes, attach files
 
 ```bash
 cupt time start <task-id>         # start a timer
@@ -131,7 +173,7 @@ cupt attach add <task-id> <file>
 cupt attach get <task-id> <selector>
 ```
 
-### 7. Going offline
+### 8. Going offline
 
 Every `cupt list` invocation silently caches the tasks it just showed (plus their details and comments) for offline reads. When you know you're about to lose network, run:
 
@@ -141,7 +183,7 @@ cupt list --offline               # later, on the plane
 cupt show <task-id> --offline
 ```
 
-### 8. Pipe everything
+### 9. Pipe everything
 
 Every read command supports `--json`:
 
@@ -159,16 +201,19 @@ You now know enough to be productive. The command reference below is a quicker r
 | `cupt auth` / `cupt logout` / `cupt status` | Manage credentials and check current account/workspace |
 | `cupt config --workspace-id <id>` | Override the default workspace |
 | `cupt teams` | List ClickUp teams (user-groups) in the workspace |
-| `cupt list [--overdue\|--today\|--week] [--tag X] [--no-tag X] [--team X] [--mine\|--all] [--json] [--offline]` | List tasks with stackable filters |
-| `cupt show <id> [--notes] [--json] [--offline]` | Full task details |
-| `cupt context <id>` | Parent + sibling/subtask view |
+| `cupt list [--overdue\|--today\|--week] [--tag X] [--no-tag X] [--team X] [--mine\|--all] [--json] [--offline]` | List tasks with stackable filters. Interactive sessions get a `#` short-ID column. |
+| `cupt show [<id>] [--notes] [--json] [--offline]` | Full task details. Falls back to the active task when no ID is given. |
+| `cupt context [<id>]` | Parent + sibling/subtask view. Falls back to active. |
 | `cupt statuses <id> [--list] [--json]` | Show available statuses for a task's list (or pass `--list <list-id>`) |
-| `cupt done <id> [--note "…"] [--auto-note] [--dry-run]` | Mark complete; `--dry-run` previews; `--auto-note` uses a local AI to draft a note |
+| `cupt done [<id>] [--note "…"] [--auto-note] [--dry-run]` | Mark complete; clears the active pointer on success. `--dry-run` previews; `--auto-note` uses a local AI to draft a note |
+| `cupt add "<name>" [--list X] [--parent <id\|this>] [--blocks <id\|this>] [-d "…"] [--due …] [--tag X] [--json]` | Create a new task. Defaults: active task's list, you as assignee, no link. |
+| `cupt start <id>` / `cupt stop` / `cupt active` | Set / clear / show the session's active task (interactive only). |
 | `cupt tag add\|remove <id> <name>` | Tag management |
-| `cupt time start <id>` / `cupt time stop` / `cupt time add <id> <dur>` / `cupt time status` | Time tracking |
-| `cupt note <id> "<text>"` / `cupt notes <id>` | Add or list comments |
+| `cupt time start [<id>]` / `cupt time stop` / `cupt time add [<id>] <dur>` / `cupt time status` | Time tracking. `start` and `add` fall back to the active task. |
+| `cupt note [<id>] "<text>"` / `cupt notes [<id>]` | Add or list comments; both fall back to the active task. |
 | `cupt attach list\|add\|get <id> [args]` | Attachment management |
 | `cupt prefetch` | Cache details for the current task set for offline use |
+| Global: `--interactive` / `--no-interactive`, `CUPT_INTERACTIVE=1\|0` | Force interactive (short IDs + active task) or stateless mode. Default: enabled when stdout is a TTY. |
 
 ## Use as a Python library
 
@@ -259,8 +304,8 @@ If you're reading ClickUp's API docs and see `team_id`, that's the workspace ID.
 
 `cupt` is built with a focus on stability and testability.
 
-- **Coverage**: 86%
-- **Tests**: 228 unit tests using `pytest` and mocks, ~0.3s wall time.
+- **Coverage**: 85%
+- **Tests**: 292 unit tests using `pytest` and mocks, ~0.4s wall time.
 
 ```bash
 pytest --cov=cupt tests/
@@ -269,9 +314,7 @@ pytest --cov=cupt tests/
 ## Future Roadmap
 Planned features for upcoming releases:
 - **`cupt work` / `cupt gtd`**: Sequential "focused work" mode to tackle a list of tasks one by one.
-- **Quick Create**: Rapidly create follow-up tasks or subtasks while you work.
-- **Workflow State**: Persistent session state for long-running workflows.
-- **Shell Completion**: Tab-completion for task IDs and commands.
+- **Shell Completion**: Tab-completion for task IDs (drawing from the local short-ID table) and commands.
 - **Local AI integration**: Optional Ollama/Apple Intelligence/Windows Copilot backends for natural-language summaries and note suggestions.
 - **Policy ingestion**: Pull guidance documents from ClickUp lists/folders so agents follow the right rules per area.
 
