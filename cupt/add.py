@@ -64,7 +64,11 @@ def _resolve_link_target(
 
 @click.command(name="add")
 @click.argument("name")
-@click.option("--list", "list_id", help="Target list ID (defaults to active task's list, then user.default_list_id)")
+@click.option(
+    "--list",
+    "list_id",
+    help="Target list ID (defaults to active task's list, then user.default_list_id)",
+)
 @click.option(
     "--parent",
     default=None,

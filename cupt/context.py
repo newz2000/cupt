@@ -7,6 +7,8 @@ duplicating the ConfigManager / ClickUpClient boilerplate inline.
 
 from typing import Optional, Tuple
 
+import click
+
 from cupt.api import ClickUpClient
 from cupt.config import ConfigManager
 from cupt.utils import print_error
@@ -18,9 +20,8 @@ def get_client_context(
     """
     Build (config, client, workspace_id) for an authenticated command.
 
-    Returns (None, None, None) and prints an actionable error if the
-    preconditions are not met.  Callers should check ``if not client``
-    before proceeding.
+    Prints an actionable error and exits with code 2 if authentication
+    or workspace preconditions are not met.
 
     Args:
         need_workspace: When True (default) also validates that a workspace
@@ -31,14 +32,14 @@ def get_client_context(
 
     if not config.is_authenticated():
         print_error("Not authenticated. Run 'cupt auth' to authenticate.")
-        return None, None, None
+        raise click.exceptions.Exit(2)
 
     workspace_id = config.get("user.workspace_id")
     if need_workspace and not workspace_id:
         print_error(
             "Workspace ID not set. Run 'cupt config --workspace-id <id>' first."
         )
-        return None, None, None
+        raise click.exceptions.Exit(2)
 
     client = ClickUpClient(config.get("auth.access_token"))
     return config, client, workspace_id

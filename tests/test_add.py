@@ -326,9 +326,7 @@ def test_due_invalid_errors(
     mock_client.create_task.assert_not_called()
 
 
-def test_json_output(
-    runner, mock_config, mock_client, non_interactive, isolated_state
-):
+def test_json_output(runner, mock_config, mock_client, non_interactive, isolated_state):
     mock_config.get.side_effect = _config_get(
         {"user.user_id": "100", "user.default_list_id": "L"}
     )

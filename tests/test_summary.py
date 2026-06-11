@@ -41,6 +41,19 @@ def _empty_client(mock_client):
 # ---------------------------------------------------------------------------
 
 
+def test_summary_json_output(runner, mock_config, mock_client):
+    _empty_client(mock_client)
+    with patch(
+        "cupt.summary.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        result = runner.invoke(summary_cmd, ["--json"])
+    assert result.exit_code == 0
+    payload = __import__("json").loads(result.output)
+    assert payload["scope"] == "mine"
+    assert payload["due_today"] == []
+    assert payload["time_tracked_ms"] == 0
+
+
 def test_summary_cmd_empty(runner, mock_config, mock_client):
     """With no data, all sections show empty-state messages."""
     with patch(

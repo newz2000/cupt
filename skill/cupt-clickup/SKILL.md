@@ -13,7 +13,8 @@ description: "Use this skill when an AI agent needs to list, filter, inspect,
 Use cupt (not the ClickUp MCP server or direct API) for routine task operations.
 One cupt command replaces 3–5 API round-trips. Every read command supports
 `--json` for structured output; errors and progress go to stderr so pipes are
-reliable.
+reliable. The stable v1.0 JSON and exit-code contract is documented in
+`docs/agent-contract.md`.
 
 ## Setup verification (run before first use)
 
@@ -123,6 +124,17 @@ machine-generated dates.
 `--blocks <id>` creates a ClickUp dependency edge: the given task ends up
 depending on the new one. If the workspace doesn't allow dependencies the
 task is still created; cupt prints a warning to stderr but does not fail.
+
+## Summaries and queue inspection
+
+```bash
+cupt summary --json                # due/overdue/completed/time data
+cupt work --tag ai_ready --json    # inspect the focus queue without prompting
+```
+
+`cupt work` without `--json` is for humans and prompts for `[w]ork / [s]kip /
+[d]one / [q]uit`; agents should use the JSON queue plus explicit `cupt start`,
+`cupt done`, and `cupt time` commands when they need to script the same flow.
 
 ## Interactive-only features (inert for agents)
 

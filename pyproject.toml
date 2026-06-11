@@ -12,7 +12,7 @@ license = "MIT"
 authors = [{name = "Matthew Nuzum", email = "matthew@nuzum.com"}]
 keywords = ["clickup", "cli", "tasks", "productivity", "task-management"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Intended Audience :: End Users/Desktop",
@@ -36,6 +36,14 @@ dependencies = [
     "python-dotenv>=0.19.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "build>=1.0",
+    "pytest-cov>=4.1",
+    "ruff>=0.5",
+    "babel>=2.12",
+]
+
 [project.urls]
 Homepage = "https://github.com/newz2000/cupt"
 Repository = "https://github.com/newz2000/cupt"
@@ -47,6 +55,9 @@ cupt = "cupt.main:cli"
 
 [tool.setuptools]
 packages = ["cupt", "cupt.services"]
+
+[tool.setuptools.package-data]
+cupt = ["py.typed", "locale/cupt.pot", "locale/*/LC_MESSAGES/*.po"]
 
 [tool.setuptools.dynamic]
 version = {attr = "cupt.__version__"}
@@ -90,3 +101,10 @@ quote-style = "double"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-q"
+
+[tool.coverage.run]
+source = ["cupt"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true

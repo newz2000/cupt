@@ -14,6 +14,7 @@ from cupt.api import ClickUpClient
 from cupt.attachments import attach_group
 from cupt.auth import OAuthManager
 from cupt.config import ConfigManager
+from cupt.i18n import configure_language
 from cupt.notes import add_note, list_notes
 from cupt.summary import summary_cmd
 from cupt.tags import tag_group
@@ -32,6 +33,7 @@ from cupt.utils import (
     print_warning,
     set_interactive_override,
 )
+from cupt.work import work_cmd
 
 
 def _set_interactive_callback(ctx, param, value):
@@ -61,6 +63,12 @@ def _set_interactive_callback(ctx, param, value):
     ),
 )
 @click.option(
+    "--lang",
+    envvar="CUPT_LANG",
+    help="Language code for CLI messages (for example: en, es).",
+    is_eager=True,
+)
+@click.option(
     "--interactive/--no-interactive",
     default=None,
     is_eager=True,
@@ -71,9 +79,9 @@ def _set_interactive_callback(ctx, param, value):
         "Default: enabled when stdout is a TTY."
     ),
 )
-def cli():
+def cli(lang=None):
     """CUPT - ClickUp Task Management CLI"""
-    pass
+    configure_language(lang)
 
 
 @cli.command()
@@ -330,6 +338,7 @@ cli.add_command(attach_group)
 cli.add_command(add_note)
 cli.add_command(list_notes)
 cli.add_command(summary_cmd)
+cli.add_command(work_cmd)
 
 cli.add_command(start_cmd)
 cli.add_command(stop_cmd)

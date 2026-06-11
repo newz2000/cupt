@@ -1,0 +1,12 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: cupt 1.0\n"
+"Language: es\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "CUPT - ClickUp Task Management CLI"
+msgstr "CUPT - CLI de gestión de tareas de ClickUp"
+
+msgid "No active task. Use `cupt start <id>` to set one."
+msgstr "No hay una tarea activa. Usa `cupt start <id>` para establecer una."

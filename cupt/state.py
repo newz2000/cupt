@@ -95,9 +95,7 @@ class StateManager:
     def get_active(self) -> Optional[Dict[str, Any]]:
         return self._load().get("active_task")
 
-    def set_active(
-        self, clickup_id: str, name: str
-    ) -> Optional[Dict[str, Any]]:
+    def set_active(self, clickup_id: str, name: str) -> Optional[Dict[str, Any]]:
         """Set the active task. Returns the previous active task, if any."""
         state = self._load()
         previous = state.get("active_task")

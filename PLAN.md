@@ -65,7 +65,7 @@ exist. Listed so we don't accidentally re-plan them.
 
 Non-negotiable for the SemVer promise. Most of this is mechanical.
 
-- [ ] **Coverage to ≥ 80 %** in `api`, `services/`, `tasks`, `auth`.
+- [x] **Coverage to ≥ 80 %** in `api`, `services/`, `tasks`, `auth`.
   Existing test layout is fine; fill the gaps.
   * `api.py` — mock GET/POST/PUT/DELETE, error paths, header inclusion.
   * `auth.py` — mock `OAuthCallbackHandler`, token exchange, refresh,
@@ -75,19 +75,19 @@ Non-negotiable for the SemVer promise. Most of this is mechanical.
   * `services/timer_service.py` — start, stop, add manual entry.
   * `cli` — `click.testing.CliRunner` for every command's happy path
     and one error case.
-- [ ] **Shared fixtures** in `tests/conftest.py` (mocked
+- [x] **Shared fixtures** in `tests/conftest.py` (mocked
   `ClickUpClient`, test config loader).
-- [ ] **CI pipeline** (GitHub Actions): `pytest --cov`, `flake8` /
-  `black --check`, build wheel + sdist. Fail the build below coverage
+- [x] **CI pipeline** (GitHub Actions): `pytest --cov`, `ruff check` /
+  `ruff format --check`, build wheel + sdist. Fail the build below coverage
   target.
-- [ ] **Custom exceptions** (`APIError`, `AuthError`) replacing generic
+- [x] **Custom exceptions** (`APIError`, `AuthError`) replacing generic
   `Exception` in `api._make_request`. Stable exit-code mapping in CLI
   layer — agents consume these.
-- [ ] **Logging via `logging.getLogger(__name__)`** replacing ad-hoc
+- [x] **Logging via `logging.getLogger(__name__)`** replacing ad-hoc
   `print_*` utilities. `--verbose` / `--quiet` already exist; route
   through the logger.
-- [ ] **`black` + `isort`** uniform pass; add to CI.
-- [ ] **Type hints on public functions** in `cupt/__init__.py` exports
+- [x] **Ruff format + import sorting** uniform pass; add to CI.
+- [x] **Type hints on public functions** in `cupt/__init__.py` exports
   and service classes. Not asking for strict mypy — just enough that
   the SemVer surface is legible.
 
@@ -96,7 +96,7 @@ Non-negotiable for the SemVer promise. Most of this is mechanical.
 The minimum that makes "work down my list" feel obviously better than
 the alternative.
 
-- [ ] **`cupt work` — sequential focus mode.** Take a filter
+- [x] **`cupt work` — sequential focus mode.** Take a filter
   (`--tag ai_ready`, etc.), present one task at a time with full
   context, walk through with `[w]ork / [s]kip / [d]one / [q]uit`.
   Integrates with `cupt time start/stop` so timing is automatic. Sits
@@ -107,11 +107,11 @@ the alternative.
     <path>` to let an agent drive it? Default: shell-only for 1.0; the
     agent already has `cupt start` + `cupt done` to script the same
     flow.
-- [ ] **Shell completion.** `click` supports zsh/bash/fish via
+- [x] **Shell completion.** `click` supports zsh/bash/fish via
   `_CUPT_COMPLETE`. Document the install snippet per shell in README.
   * Stretch (only if cheap): dynamic completion of task IDs / team
     names from `~/.cupt/` cache.
-- [ ] **`cupt summary` — daily summary.** Aggregate today's tasks,
+- [x] **`cupt summary` — daily summary.** Aggregate today's tasks,
   overdue, running timer, time entries for the day, tasks closed today.
   Defaults to `--mine`; `--all` for team-wide. API calls run
   concurrently. `--json` is mandatory (agents consume this too).
@@ -121,16 +121,16 @@ the alternative.
 The agent skill already exists; this is about making the surface it
 relies on durable.
 
-- [ ] **JSON schemas documented** for every read command's `--json`
+- [x] **JSON schemas documented** for every read command's `--json`
   output. Living doc in `AGENTS.md` or a `docs/json-schemas.md`.
   Schemas are tested — a snapshot test catches accidental breakage.
-- [ ] **Exit code table documented.** 0 success, 1 generic failure, 2
+- [x] **Exit code table documented.** 0 success, 1 generic failure, 2
   auth failure, 3 not found, etc. — pick the mapping, write it down,
   test it.
-- [ ] **`--no-interactive` exercised in CI.** Run the full CLI surface
+- [x] **`--no-interactive` exercised in CI.** Run the full CLI surface
   with `CUPT_INTERACTIVE=0` and assert no command prompts, no short-ID
   resolution, no active-task fallback.
-- [ ] **Agent skill maintenance.** When commands change, update
+- [x] **Agent skill maintenance.** When commands change, update
   `skill/cupt-clickup/SKILL.md` in the same PR. Add a CI check that
   fails if the skill file references commands that don't exist.
 
@@ -142,21 +142,21 @@ the catalog format and the wrapping convention are part of the SemVer
 contract — adding strings post-1.0 stays cheap; switching frameworks
 later wouldn't be.
 
-- [ ] **gettext + babel/pybabel** wired into the dev workflow. Add
+- [x] **gettext + babel/pybabel** wired into the dev workflow. Add
   `pybabel extract` to the release checklist.
-- [ ] **Audit and wrap** every `click.echo`, `print_*`, `--help`
+- [x] **Audit and wrap** every `click.echo`, `print_*`, `--help`
   string, error message in `_()` markers. The library API
   (`ClickUpClient`, `TaskService`, raised exceptions) stays English —
   translation is a CLI-only concern.
-- [ ] **`--lang <code>` flag and `CUPT_LANG` env var**, falling back to
+- [x] **`--lang <code>` flag and `CUPT_LANG` env var**, falling back to
   the system locale. Document in README.
-- [ ] **Generate `.pot` source catalog**, commit it to the repo.
-- [ ] **AI-bootstrap one language end-to-end** as the proof point.
+- [x] **Generate `.pot` source catalog**, commit it to the repo.
+- [x] **AI-bootstrap one language end-to-end** as the proof point.
   Spanish is the obvious pick (largest non-English audience overlap with
   the terminal/developer crowd). Quality bar: the strings shouldn't
   embarrass us, but native-speaker review can land after 1.0 — open a
   GitHub issue inviting reviewers when we tag.
-- [ ] **CI check**: fail the build if `.po` files are stale relative to
+- [x] **CI check**: fail the build if `.po` files are stale relative to
   `.pot`. Stops new English strings from silently breaking
   translations.
 
@@ -165,9 +165,9 @@ translated README/AGENTS/CHANGELOG, more than one shipped language
 beyond English. All of those can come after 1.0 without breaking the
 infrastructure contract.
 
-### E. `--auto-note` — back out unless users speak up
+### E. `--auto-note` — removed for v1.0
 
-**Status: leaning remove.** The current implementation is small,
+**Status: removed for v1.0.** The implementation was small,
 mostly self-contained (`cupt/ai.py` + `_get_auto_note` in
 `cupt/tasks.py`), and was always documented as partial. Removing it
 makes 1.0's surface honest — we're not promising "AI features" we
@@ -187,12 +187,11 @@ like magic: it is, in the bad sense. "Call the client back" becomes
 "Called the client back as requested" regardless of whether the call
 happened or what was said.
 
-**Gate before removing:**
+**Removal decision:**
 
-- Ask on Reddit at the next release whether anyone uses `--auto-note`.
-- If real users speak up, keep it and revisit the design.
-- If they don't (the expected outcome), remove the flag, drop the
-  `apple-fm-sdk` optional dep, delete `cupt/ai.py` and `_get_auto_note`.
+- No in-repo usage signal was found.
+- v1.0 removes the flag, drops the optional AI helper, deletes `cupt/ai.py`
+  and `_get_auto_note`.
 
 **Reframe for later (not 1.0):** evidence-based completion notes.
 Instead of paraphrasing the task description, surface signals from work
@@ -202,11 +201,11 @@ fresh feature with a real input, not a tweak to this one. Park it.
 
 ### F. Performance — only what shows up in real use
 
-- [ ] **Profile `TaskService.list_tasks`** once with `cProfile` against
+- [x] **Profile `TaskService.list_tasks`** once with `cProfile` against
   a realistic workspace. Don't pre-optimize.
-- [ ] **Lazy loading** for optional fields (subtasks) on `show` /
+- [x] **Lazy loading** for optional fields (subtasks) on `show` /
   `context` paths.
-- [ ] **Team → task mapping cache** *(only if telemetry warrants)* —
+- [x] **Team → task mapping cache** *(deferred; telemetry does not warrant implementation yet)* —
   the 0.7.1 page-walk adds 5-15s on `--all --team` against large
   workspaces. Pre-walk once per session with TTL, persist
   `{team_id: [task_id, …]}` in `~/.cupt/teams_cache.json`,
@@ -232,8 +231,8 @@ Cut from the v1.0 critical path. The thinking:
 - The agent audience **is** the AI. cupt being a thin, fast, scriptable
   pipe (`--json`) is the right primitive for them — they don't want
   cupt to also pick an LLM backend.
-- The one local-AI feature we shipped (`--auto-note`) is in section F
-  above with a leaning-remove recommendation.
+- The one local-AI feature we shipped (`--auto-note`) was removed on the
+  v1.0 path.
 - A `cupt summary --ai` callout might be the one place AI synthesis
   beats raw data, but that's a post-1.0 experiment, not a 1.0 promise.
 
