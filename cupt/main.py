@@ -14,7 +14,7 @@ from cupt.api import ClickUpClient
 from cupt.attachments import attach_group
 from cupt.auth import OAuthManager
 from cupt.config import ConfigManager
-from cupt.i18n import configure_language
+from cupt.i18n import _, configure_language, format_message, translate_click_metadata
 from cupt.notes import add_note, list_notes
 from cupt.summary import summary_cmd
 from cupt.tags import tag_group
@@ -45,6 +45,13 @@ def _set_interactive_callback(ctx, param, value):
     return value
 
 
+def _set_language_callback(ctx, param, value):
+    """Configure translations before Click renders command help."""
+    configure_language(value)
+    translate_click_metadata(ctx.find_root().command)
+    return value
+
+
 @click.group()
 @click.version_option(version=__version__)
 @click.option(
@@ -67,6 +74,8 @@ def _set_interactive_callback(ctx, param, value):
     envvar="CUPT_LANG",
     help="Language code for CLI messages (for example: en, es).",
     is_eager=True,
+    expose_value=False,
+    callback=_set_language_callback,
 )
 @click.option(
     "--interactive/--no-interactive",
@@ -79,9 +88,8 @@ def _set_interactive_callback(ctx, param, value):
         "Default: enabled when stdout is a TTY."
     ),
 )
-def cli(lang=None):
+def cli():
     """CUPT - ClickUp Task Management CLI"""
-    configure_language(lang)
 
 
 @cli.command()
@@ -92,37 +100,37 @@ def auth():
     # Check if already has personal token
     existing_token = config.get("auth.access_token")
     if existing_token and existing_token.startswith("pk_"):
-        print_success("Already authenticated with Personal API Token")
+        print_success(_("Already authenticated with Personal API Token"))
         return
 
     # Ask user which method to use
-    click.echo("Choose authentication method:")
-    click.echo("1. OAuth (recommended for teams)")
-    click.echo("2. Personal API Token (simpler, individual use)")
-    choice = click.prompt("Enter choice (1 or 2)", type=int, default=1)
+    click.echo(_("Choose authentication method:"))
+    click.echo(_("1. OAuth (recommended for teams)"))
+    click.echo(_("2. Personal API Token (simpler, individual use)"))
+    choice = click.prompt(_("Enter choice (1 or 2)"), type=int, default=1)
 
     if choice == 2:
         # Personal API Token method
-        click.echo("\nTo get your Personal API Token:")
-        click.echo("1. Go to: https://app.clickup.com/settings/apps")
-        click.echo("2. Copy your Personal API Token (starts with 'pk_')")
+        click.echo("\n" + _("To get your Personal API Token:"))
+        click.echo(_("1. Go to: https://app.clickup.com/settings/apps"))
+        click.echo(_("2. Copy your Personal API Token (starts with 'pk_')"))
         click.echo()
 
         api_token = click.prompt(
-            "Enter your Personal API Token", hide_input=True, type=str
+            _("Enter your Personal API Token"), hide_input=True, type=str
         )
 
         if not api_token:
-            print_error("API Token is required")
+            print_error(_("API Token is required"))
             sys.exit(1)
 
         if not api_token.startswith("pk_"):
-            print_error("Personal API tokens should start with 'pk_'")
+            print_error(_("Personal API tokens should start with 'pk_'"))
             sys.exit(1)
 
         # Store token
         config.set("auth.access_token", api_token)
-        print_success("Authenticated with Personal API Token")
+        print_success(_("Authenticated with Personal API Token"))
 
         # Try to get user info
         try:
@@ -133,30 +141,41 @@ def auth():
             if workspaces:
                 config.set("user.workspace_id", workspaces[0]["id"])
                 config.set("user.user_id", user_info["user"]["id"])
-                print_success(f"Authenticated as {user_info['user']['username']}")
-                print_success(f"Default workspace: {workspaces[0]['name']}")
+                print_success(
+                    format_message(
+                        "Authenticated as {username}",
+                        username=user_info["user"]["username"],
+                    )
+                )
+                print_success(
+                    format_message(
+                        "Default workspace: {workspace}",
+                        workspace=workspaces[0]["name"],
+                    )
+                )
 
         except Exception as e:
-            print_error(f"Failed to get user info: {e}")
+            print_error(format_message("Failed to get user info: {error}", error=e))
 
     else:
         # OAuth method
         click.echo(
-            "\nTo authenticate with ClickUp, you'll need to create an OAuth app:"
+            "\n"
+            + _("To authenticate with ClickUp, you'll need to create an OAuth app:")
         )
-        click.echo("1. Go to: https://app.clickup.com/settings/apps")
-        click.echo("2. Click 'Create new app'")
-        click.echo("3. Set redirect URL to: http://localhost:4321")
-        click.echo("4. Copy your Client ID and Client Secret")
+        click.echo(_("1. Go to: https://app.clickup.com/settings/apps"))
+        click.echo(_("2. Click 'Create new app'"))
+        click.echo(_("3. Set redirect URL to: http://localhost:4321"))
+        click.echo(_("4. Copy your Client ID and Client Secret"))
         click.echo()
 
-        client_id = click.prompt("Enter your ClickUp Client ID", type=str)
+        client_id = click.prompt(_("Enter your ClickUp Client ID"), type=str)
         client_secret = click.prompt(
-            "Enter your ClickUp Client Secret", hide_input=True, type=str
+            _("Enter your ClickUp Client Secret"), hide_input=True, type=str
         )
 
         if not client_id or not client_secret:
-            print_error("Client ID and Client Secret are required")
+            print_error(_("Client ID and Client Secret are required"))
             sys.exit(1)
 
         # Start OAuth flow
@@ -175,17 +194,27 @@ def auth():
                     config.set("user.workspace_id", workspaces[0]["id"])
                     config.set("user.user_id", user_info["user"]["id"])
 
-                    print_success(f"Authenticated as {user_info['user']['username']}")
-                    print_success(f"Default workspace: {workspaces[0]['name']}")
+                    print_success(
+                        format_message(
+                            "Authenticated as {username}",
+                            username=user_info["user"]["username"],
+                        )
+                    )
+                    print_success(
+                        format_message(
+                            "Default workspace: {workspace}",
+                            workspace=workspaces[0]["name"],
+                        )
+                    )
                 else:
                     print_warning(
-                        "No workspaces found - you may need to join one in ClickUp"
+                        _("No workspaces found - you may need to join one in ClickUp")
                     )
 
             except Exception as e:
-                print_error(f"Failed to get user info: {e}")
+                print_error(format_message("Failed to get user info: {error}", error=e))
         else:
-            print_error("Authentication failed")
+            print_error(_("Authentication failed"))
 
 
 @cli.command()
@@ -202,7 +231,7 @@ def status():
     config = ConfigManager()
 
     if not config.is_authenticated():
-        print_warning("Not authenticated. Run 'cupt auth' to authenticate.")
+        print_warning(_("Not authenticated. Run 'cupt auth' to authenticate."))
         return
 
     try:
@@ -213,15 +242,22 @@ def status():
         if workspace_id:
             workspaces = client.get_workspaces()
             current_ws = next((w for w in workspaces if w["id"] == workspace_id), None)
-            workspace_name = current_ws["name"] if current_ws else "Unknown"
+            workspace_name = current_ws["name"] if current_ws else _("Unknown")
         else:
-            workspace_name = "Not set"
+            workspace_name = _("Not set")
 
-        print_success(f"Authenticated as: {user_info['user']['username']}")
-        print_success(f"Workspace: {workspace_name}")
+        print_success(
+            format_message(
+                "Authenticated as: {username}",
+                username=user_info["user"]["username"],
+            )
+        )
+        print_success(
+            format_message("Workspace: {workspace}", workspace=workspace_name)
+        )
 
     except Exception as e:
-        print_error(f"Failed to get status: {e}")
+        print_error(format_message("Failed to get status: {error}", error=e))
 
 
 @cli.command()
@@ -237,13 +273,13 @@ def teams(workspace_id, as_json):
 
     config = ConfigManager()
     if not config.is_authenticated():
-        print_warning("Not authenticated. Run 'cupt auth' first.")
+        print_warning(_("Not authenticated. Run 'cupt auth' first."))
         return
 
     ws_id = workspace_id or config.get("user.workspace_id")
     if not ws_id:
         print_error(
-            "Workspace ID not set. Run 'cupt config --workspace-id <id>' first."
+            _("Workspace ID not set. Run 'cupt config --workspace-id <id>' first.")
         )
         return
 
@@ -251,7 +287,7 @@ def teams(workspace_id, as_json):
         client = ClickUpClient(config.get("auth.access_token"))
         team_list = client.get_teams(ws_id)
     except Exception as e:
-        print_error(f"Failed to fetch teams: {e}")
+        print_error(format_message("Failed to fetch teams: {error}", error=e))
         return
 
     if as_json:
@@ -259,10 +295,10 @@ def teams(workspace_id, as_json):
         return
 
     if not team_list:
-        print_warning("No teams found in this workspace.")
+        print_warning(_("No teams found in this workspace."))
         return
 
-    click.echo(f"\n{'ID':<14} {'Members':<8} {'Name'}")
+    click.echo(f"\n{_('ID'):<14} {_('Members'):<8} {_('Name')}")
     click.echo("-" * 60)
     for t in team_list:
         tid = t.get("id", "?")
@@ -283,41 +319,52 @@ def config(workspace_id, default_list, api_token, clear_cache, show):
 
     if clear_cache:
         config_manager.clear_cache()
-        print_success("Persistent cache cleared")
+        print_success(_("Persistent cache cleared"))
         return
 
     if show:
-        click.echo("Current configuration:")
+        click.echo(_("Current configuration:"))
         click.echo(
-            f"  Workspace ID: {config_manager.get('user.workspace_id', 'Not set')}"
+            f"  {_('Workspace ID')}: "
+            f"{config_manager.get('user.workspace_id', _('Not set'))}"
         )
         click.echo(
-            f"  Default List ID: {config_manager.get('user.default_list_id', 'Not set')}"
+            f"  {_('Default List ID')}: "
+            f"{config_manager.get('user.default_list_id', _('Not set'))}"
         )
-        click.echo(f"  User ID: {config_manager.get('user.user_id', 'Not set')}")
         click.echo(
-            f"  Authenticated: {'Yes' if config_manager.is_authenticated() else 'No'}"
+            f"  {_('User ID')}: {config_manager.get('user.user_id', _('Not set'))}"
+        )
+        click.echo(
+            f"  {_('Authenticated')}: "
+            f"{_('Yes') if config_manager.is_authenticated() else _('No')}"
         )
 
         # Show if using personal token
         token = config_manager.get("auth.access_token")
         if token and token.startswith("pk_"):
-            click.echo("  Auth Method: Personal API Token")
+            click.echo(f"  {_('Auth Method')}: {_('Personal API Token')}")
         else:
-            click.echo("  Auth Method: OAuth")
+            click.echo(f"  {_('Auth Method')}: {_('OAuth')}")
         return
 
     if api_token:
         config_manager.set("auth.access_token", api_token)
-        print_success("Personal API Token set")
+        print_success(_("Personal API Token set"))
 
     if workspace_id:
         config_manager.set("user.workspace_id", workspace_id)
-        print_success(f"Workspace ID set to: {workspace_id}")
+        print_success(
+            format_message(
+                "Workspace ID set to: {workspace_id}", workspace_id=workspace_id
+            )
+        )
 
     if default_list:
         config_manager.set("user.default_list_id", default_list)
-        print_success(f"Default list ID set to: {default_list}")
+        print_success(
+            format_message("Default list ID set to: {list_id}", list_id=default_list)
+        )
 
     if not workspace_id and not default_list and not api_token and not show:
         click.echo(click.get_current_context().get_help())

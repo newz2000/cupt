@@ -4,6 +4,7 @@ import click
 import requests
 
 from cupt.context import get_client_context
+from cupt.i18n import _, format_message
 from cupt.utils import print_error, print_success, print_warning
 
 
@@ -31,7 +32,11 @@ def _resolve(attachments, selector):
         return matches[0]
     if len(matches) > 1:
         raise click.ClickException(
-            f"'{selector}' matches {len(matches)} attachments — be more specific or use an index"
+            format_message(
+                "'{selector}' matches {count} attachments — be more specific or use an index",
+                selector=selector,
+                count=len(matches),
+            )
         )
     return None
 
@@ -46,22 +51,22 @@ def attach_group():
 @click.argument("task_id")
 def list_attachments(task_id):
     """List attachments on a task"""
-    _, client, _ = get_client_context(need_workspace=False)
+    _config, client, _workspace_id = get_client_context(need_workspace=False)
     if not client:
         return
 
     try:
         task = client.get_task(task_id)
     except Exception as e:
-        print_error(f"Failed to fetch task: {e}")
+        print_error(format_message("Failed to fetch task: {error}", error=e))
         return
 
     attachments = task.get("attachments") or []
     if not attachments:
-        print_warning(f"No attachments on {task_id}.")
+        print_warning(format_message("No attachments on {task_id}.", task_id=task_id))
         return
 
-    click.echo(f"\n{'#':<4} {'Size':<10} {'Name'}")
+    click.echo(f"\n{'#':<4} {_('Size'):<10} {_('Name')}")
     click.echo("-" * 60)
     for i, a in enumerate(attachments, start=1):
         click.echo(
@@ -80,29 +85,31 @@ def list_attachments(task_id):
 )
 def get_attachment(task_id, selector, output):
     """Download an attachment by 1-based index or filename substring"""
-    _, client, _ = get_client_context(need_workspace=False)
+    _config, client, _workspace_id = get_client_context(need_workspace=False)
     if not client:
         return
 
     try:
         task = client.get_task(task_id)
     except Exception as e:
-        print_error(f"Failed to fetch task: {e}")
+        print_error(format_message("Failed to fetch task: {error}", error=e))
         return
 
     attachments = task.get("attachments") or []
     if not attachments:
-        print_warning(f"No attachments on {task_id}.")
+        print_warning(format_message("No attachments on {task_id}.", task_id=task_id))
         return
 
     target = _resolve(attachments, selector)
     if not target:
-        print_error(f"No attachment matches '{selector}'.")
+        print_error(
+            format_message("No attachment matches '{selector}'.", selector=selector)
+        )
         return
 
     url = target.get("url")
     if not url:
-        print_error("Attachment has no download URL.")
+        print_error(_("Attachment has no download URL."))
         return
 
     # No auth header — these are pre-signed S3 URLs; sending Authorization
@@ -111,7 +118,7 @@ def get_attachment(task_id, selector, output):
         response = requests.get(url, timeout=60, stream=True)
         response.raise_for_status()
     except requests.exceptions.RequestException as e:
-        print_error(f"Download failed: {e}")
+        print_error(format_message("Download failed: {error}", error=e))
         return
 
     out_path = output or target.get("title") or "attachment.bin"
@@ -121,10 +128,16 @@ def get_attachment(task_id, selector, output):
                 if chunk:
                     fh.write(chunk)
     except OSError as e:
-        print_error(f"Could not write to {out_path}: {e}")
+        print_error(
+            format_message("Could not write to {path}: {error}", path=out_path, error=e)
+        )
         return
 
-    print_success(f"Downloaded {target.get('title')} -> {out_path}")
+    print_success(
+        format_message(
+            "Downloaded {title} -> {path}", title=target.get("title"), path=out_path
+        )
+    )
 
 
 @attach_group.command("add")
@@ -133,13 +146,17 @@ def get_attachment(task_id, selector, output):
 @click.option("--name", help="Override the filename stored on ClickUp")
 def add_attachment(task_id, file_path, name):
     """Upload a file as a task attachment"""
-    _, client, _ = get_client_context(need_workspace=False)
+    _config, client, _workspace_id = get_client_context(need_workspace=False)
     if not client:
         return
 
     try:
         result = client.upload_task_attachment(task_id, file_path, name)
         title = result.get("title") or name or os.path.basename(file_path)
-        print_success(f"Attached '{title}' to {task_id}")
+        print_success(
+            format_message(
+                "Attached '{title}' to {task_id}", title=title, task_id=task_id
+            )
+        )
     except Exception as e:
-        print_error(f"Failed to upload attachment: {e}")
+        print_error(format_message("Failed to upload attachment: {error}", error=e))

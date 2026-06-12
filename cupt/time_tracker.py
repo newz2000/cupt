@@ -3,6 +3,7 @@ from datetime import datetime
 import click
 
 from cupt.context import get_client_context
+from cupt.i18n import _, format_message
 from cupt.resolver import IDResolutionError, resolve_task_id
 from cupt.services.time_service import TimeService
 from cupt.utils import (
@@ -30,44 +31,46 @@ def start_timer(task_id):
         print_error(str(e))
         return
 
-    _, client, workspace_id = get_client_context()
+    _config, client, workspace_id = get_client_context()
     if not client:
         return
 
     try:
         service = TimeService(client, workspace_id)
         if service.get_running_timer():
-            print_warning("Timer is already running. Stop current timer first.")
+            print_warning(_("Timer is already running. Stop current timer first."))
             return
         service.start_timer(task_id)
-        print_success(f"Started tracking time for task {task_id}")
+        print_success(
+            format_message("Started tracking time for task {task_id}", task_id=task_id)
+        )
     except Exception as e:
-        print_error(f"Failed to start timer: {e}")
+        print_error(format_message("Failed to start timer: {error}", error=e))
 
 
 @time_group.command("stop")
 @click.argument("task_id", required=False)
 def stop_timer(task_id=None):
     """Stop current time tracking"""
-    _, client, workspace_id = get_client_context()
+    _config, client, workspace_id = get_client_context()
     if not client:
         return
 
     try:
         service = TimeService(client, workspace_id)
         if not service.get_running_timer():
-            print_warning("No timer is currently running.")
+            print_warning(_("No timer is currently running."))
             return
         service.stop_timer()
-        print_success("Timer stopped")
+        print_success(_("Timer stopped"))
     except Exception as e:
-        print_error(f"Failed to stop timer: {e}")
+        print_error(format_message("Failed to stop timer: {error}", error=e))
 
 
 @time_group.command("status")
 def timer_status():
     """Show current timer status"""
-    _, client, workspace_id = get_client_context()
+    _config, client, workspace_id = get_client_context()
     if not client:
         return
 
@@ -76,18 +79,20 @@ def timer_status():
         running_timer = service.get_running_timer()
 
         if running_timer:
-            task_id = running_timer.get("task_id", "Unknown")
+            task_id = running_timer.get("task_id", _("Unknown"))
             start_time = running_timer.get("start", 0)
-            click.echo("✅ Timer is running")
-            click.echo(f"   Task ID: {task_id}")
+            click.echo(_("✅ Timer is running"))
+            click.echo(f"   {_('Task ID')}: {task_id}")
             if start_time:
                 start_dt = datetime.fromtimestamp(start_time / 1000)
-                click.echo(f"   Started: {start_dt.strftime('%Y-%m-%d %H:%M:%S')}")
+                click.echo(
+                    f"   {_('Started')}: {start_dt.strftime('%Y-%m-%d %H:%M:%S')}"
+                )
         else:
-            print_warning("No timer is currently running")
+            print_warning(_("No timer is currently running"))
 
     except Exception as e:
-        print_error(f"Failed to get timer status: {e}")
+        print_error(format_message("Failed to get timer status: {error}", error=e))
 
 
 @time_group.command("add")
@@ -107,7 +112,7 @@ def add_time(args, message):
     elif len(args) == 1:
         task_id_arg, duration = None, args[0]
     else:
-        print_error("Usage: cupt time add [<task_id>] <duration>")
+        print_error(_("Usage: cupt time add [<task_id>] <duration>"))
         return
 
     try:
@@ -116,19 +121,27 @@ def add_time(args, message):
         print_error(str(e))
         return
 
-    _, client, workspace_id = get_client_context()
+    _config, client, workspace_id = get_client_context()
     if not client:
         return
 
     duration_ms = parse_duration(duration)
     if duration_ms is None:
-        print_error(f"Invalid duration format: {duration}")
+        print_error(
+            format_message("Invalid duration format: {duration}", duration=duration)
+        )
         return
 
     try:
         TimeService(client, workspace_id).add_manual_time(task_id, duration_ms, message)
-        print_success(f"Added {format_duration(duration_ms)} to task {task_id}")
+        print_success(
+            format_message(
+                "Added {duration} to task {task_id}",
+                duration=format_duration(duration_ms),
+                task_id=task_id,
+            )
+        )
         if message:
-            print_success(f"Note: {message}")
+            print_success(format_message("Note: {message}", message=message))
     except Exception as e:
-        print_error(f"Failed to add time entry: {e}")
+        print_error(format_message("Failed to add time entry: {error}", error=e))

@@ -5,7 +5,7 @@ import gettext
 import locale
 import os
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 _TRANSLATION = gettext.NullTranslations()
 
@@ -75,4 +75,41 @@ def configure_language(lang: Optional[str] = None) -> str:
 
 def _(message: str) -> str:
     """Translate a CLI message."""
-    return _TRANSLATION.gettext(message)
+    translated = _TRANSLATION.gettext(message)
+    if translated != message:
+        return translated
+    stripped = message.rstrip("\n")
+    if stripped != message:
+        stripped_translated = _TRANSLATION.gettext(stripped)
+        if stripped_translated != stripped:
+            return stripped_translated + message[len(stripped) :]
+    return translated
+
+
+def format_message(message: str, **kwargs: Any) -> str:
+    """Translate a format-string template, then interpolate values."""
+    return _(message).format(**kwargs)
+
+
+def _translated_attr(obj: Any, attr: str) -> None:
+    value = getattr(obj, attr, None)
+    if not value:
+        return
+    source_attr = f"_cupt_i18n_source_{attr}"
+    source = getattr(obj, source_attr, value)
+    setattr(obj, source_attr, source)
+    setattr(obj, attr, _(source))
+
+
+def translate_click_metadata(command: Any) -> None:
+    """Translate Click command/help metadata after a language is configured."""
+    _translated_attr(command, "help")
+    _translated_attr(command, "short_help")
+    _translated_attr(command, "epilog")
+
+    for param in getattr(command, "params", []):
+        _translated_attr(param, "help")
+        _translated_attr(param, "prompt")
+
+    for child in getattr(command, "commands", {}).values():
+        translate_click_metadata(child)

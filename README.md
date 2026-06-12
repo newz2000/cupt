@@ -235,6 +235,21 @@ You now know enough to be productive. The command reference below is a quicker r
 
 `cupt` is usable as a dependency in your own Python code. Importing it does no I/O — no config directory is created, no network calls happen until you make one explicitly.
 
+### Spanish beta localization
+
+`cupt` includes a beta Spanish CLI translation as a proof of concept:
+
+```bash
+cupt --lang es --help
+CUPT_LANG=es cupt list --help
+```
+
+The Spanish catalog is AI-generated and intended for beta feedback. Command
+names, flags, JSON keys, IDs, task content, and low-level API error payloads stay
+literal so scripts remain stable and troubleshooting stays searchable. Click's
+built-in help headings such as `Usage`, `Options`, and `Commands` may still
+appear in English.
+
 ```python
 from cupt import ClickUpClient, TaskService, APIError
 

@@ -6,6 +6,7 @@ from typing import Optional
 import click
 
 from cupt.context import get_client_context
+from cupt.i18n import _, format_message
 from cupt.resolver import IDResolutionError, resolve_task_id
 from cupt.services.task_service import TaskService
 from cupt.state import StateManager
@@ -53,9 +54,13 @@ def _print_team_filter_footer(service, elapsed: float, mine: bool) -> None:
         return  # snappy result; no need to clutter output
 
     page_cap = 15 if mine else 10
-    msg = f"(team filter: searched {pages} pages in {elapsed:.1f}s"
+    msg = format_message(
+        "(team filter: searched {pages} pages in {elapsed:.1f}s",
+        pages=pages,
+        elapsed=elapsed,
+    )
     if pages >= page_cap:
-        msg += "; hit page cap — pair with --tag for full coverage"
+        msg += _("; hit page cap — pair with --tag for full coverage")
     msg += ")"
     click.echo(msg, err=True)
 
@@ -84,11 +89,14 @@ def _render_task_list(
     if verbose:
         click.echo(
             f"\n{short_header}"
-            f"{'ID':<12} {'Status':<12} {'Due':<18} {'Assignee':<18} "
-            f"{'Est':<8} {'Tracked':<8} {'Name'}"
+            f"{_('ID'):<12} {_('Status'):<12} {_('Due'):<18} "
+            f"{_('Assignee'):<18} {_('Est'):<8} {_('Tracked'):<8} {_('Name')}"
         )
     else:
-        click.echo(f"\n{short_header}{'ID':<12} {'Status':<12} {'Due':<18} {'Name'}")
+        click.echo(
+            f"\n{short_header}{_('ID'):<12} {_('Status'):<12} "
+            f"{_('Due'):<18} {_('Name')}"
+        )
     click.echo("-" * _separator_width(verbose))
 
     for task in tasks:
@@ -145,10 +153,19 @@ def _print_active_footer(state: StateManager) -> None:
         short = state.short_id_for(active["clickup_id"])
         prefix = f"[{short}] " if short else ""
         click.echo(
-            f"\nActive: {prefix}{active['clickup_id']} — {active.get('name', '')}"
+            "\n"
+            + format_message(
+                "Active: {prefix}{task_id} — {name}",
+                prefix=prefix,
+                task_id=active["clickup_id"],
+                name=active.get("name", ""),
+            )
         )
     elif last:
-        click.echo(f"\nNo active task. Last list refresh: {last}")
+        click.echo(
+            "\n"
+            + format_message("No active task. Last list refresh: {last}", last=last)
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -275,7 +292,7 @@ def list_tasks(
     active_workspace_id = workspace_id or config_workspace_id
     if not active_workspace_id:
         print_error(
-            "Workspace ID not set. Run 'cupt config --workspace-id <id>' first."
+            _("Workspace ID not set. Run 'cupt config --workspace-id <id>' first.")
         )
         return []
 
@@ -307,7 +324,7 @@ def list_tasks(
             if as_json:
                 click.echo("[]")
             else:
-                print_warning("No active tasks found matching criteria.")
+                print_warning(_("No active tasks found matching criteria."))
             return []
 
         if hide_subtasks:
@@ -322,7 +339,7 @@ def list_tasks(
             if as_json:
                 click.echo("[]")
             else:
-                print_warning("No tasks matched the filter.")
+                print_warning(_("No tasks matched the filter."))
             return []
 
         if limit:
@@ -372,7 +389,7 @@ def list_tasks(
         return tasks
 
     except Exception as e:
-        print_error(f"Failed to list tasks: {e}")
+        print_error(format_message("Failed to list tasks: {error}", error=e))
         return []
 
 
@@ -454,16 +471,26 @@ def _list_tasks_offline(
         if as_json:
             click.echo("[]")
         else:
-            print_error("No cached data available. Run 'cupt list' while online first.")
+            print_error(
+                _("No cached data available. Run 'cupt list' while online first.")
+            )
         return []
 
     if not as_json:
         age_minutes = (time.time() - cached.get("timestamp", 0)) / 60
         if age_minutes > 60:
-            print_warning(f"Offline cache is {int(age_minutes)} minutes old.")
+            print_warning(
+                format_message(
+                    "Offline cache is {minutes} minutes old.",
+                    minutes=int(age_minutes),
+                )
+            )
         else:
             print_warning(
-                f"Offline mode — showing data cached {int(age_minutes)}m ago."
+                format_message(
+                    "Offline mode — showing data cached {minutes}m ago.",
+                    minutes=int(age_minutes),
+                )
             )
 
     tasks = cached.get("tasks", [])
@@ -473,7 +500,7 @@ def _list_tasks_offline(
         if as_json:
             click.echo("[]")
         else:
-            print_warning("No tasks in cache.")
+            print_warning(_("No tasks in cache."))
         return []
 
     if hide_subtasks:
@@ -486,7 +513,7 @@ def _list_tasks_offline(
         if as_json:
             click.echo("[]")
         else:
-            print_warning("No tasks matched the filter.")
+            print_warning(_("No tasks matched the filter."))
         return []
 
     if limit:
@@ -548,7 +575,7 @@ def show_task(
     as_json: bool = False,
 ):
     """Display full details for a single task."""
-    config, client, _ = get_client_context(need_workspace=False)
+    config, client, _workspace_id = get_client_context(need_workspace=False)
     if not client:
         return
 
@@ -562,7 +589,7 @@ def show_task(
             if as_json:
                 click.echo("null")
             else:
-                print_error(f"Task {task_id} not found")
+                print_error(format_message("Task {task_id} not found", task_id=task_id))
             return
 
         p_id = task.get("parent")
@@ -609,58 +636,70 @@ def show_task(
         _display_task(task, parent_task, comments, include_notes)
 
     except Exception as e:
-        print_error(f"Failed to show task: {e}")
+        print_error(format_message("Failed to show task: {error}", error=e))
 
 
 def _display_task(task, parent_task, comments, include_notes: bool):
     """Render task details to stdout."""
-    click.echo(f"\nTask: {task.get('name')}")
+    click.echo(f"\n{_('Task')}: {task.get('name')}")
     click.echo("=" * 40)
-    click.echo(f"ID:       {task.get('id')}")
-    click.echo(f"Status:   {task.get('status', {}).get('status', 'unknown').upper()}")
+    click.echo(f"{_('ID')}:       {task.get('id')}")
+    click.echo(
+        f"{_('Status')}:   {task.get('status', {}).get('status', 'unknown').upper()}"
+    )
     priority = task.get("priority")
     click.echo(
-        f"Priority: {priority.get('priority', 'none').upper() if priority else 'NONE'}"
+        f"{_('Priority')}: {priority.get('priority', 'none').upper() if priority else _('NONE')}"
     )
     individuals = [a.get("username", "?") for a in task.get("assignees", [])]
     groups = [g.get("name", "?") for g in task.get("group_assignees", [])]
     assignees = individuals + groups
-    click.echo(f"Assignee: {', '.join(assignees) if assignees else 'Unassigned'}")
-    click.echo(f"Due Date: {format_date(task.get('due_date'))}")
+    click.echo(
+        f"{_('Assignee')}: {', '.join(assignees) if assignees else _('Unassigned')}"
+    )
+    click.echo(f"{_('Due Date')}: {format_date(task.get('due_date'))}")
     tag_names = [t.get("name", "") for t in (task.get("tags") or []) if t.get("name")]
     if tag_names:
-        click.echo(f"Tags:     {', '.join(tag_names)}")
+        click.echo(f"{_('Tags')}:     {', '.join(tag_names)}")
     attachments = task.get("attachments") or []
     if attachments:
         click.echo(
-            f"Attach:   {len(attachments)} file(s) — use 'cupt attach list {task.get('id')}'"
+            format_message(
+                "Attach:   {count} file(s) — use 'cupt attach list {task_id}'",
+                count=len(attachments),
+                task_id=task.get("id"),
+            )
         )
-    click.echo(f"Space:    {task.get('space', {}).get('id')}")
+    click.echo(f"{_('Space')}:    {task.get('space', {}).get('id')}")
     click.echo(
-        f"Folder:   {task.get('folder', {}).get('name', 'N/A')} ({task.get('folder', {}).get('id', 'N/A')})"
+        f"{_('Folder')}:   {task.get('folder', {}).get('name', _('N/A'))} "
+        f"({task.get('folder', {}).get('id', _('N/A'))})"
     )
     click.echo(
-        f"List:     {task.get('list', {}).get('name', 'N/A')} ({task.get('list', {}).get('id', 'N/A')})"
+        f"{_('List')}:     {task.get('list', {}).get('name', _('N/A'))} "
+        f"({task.get('list', {}).get('id', _('N/A'))})"
     )
 
     p_id = task.get("parent")
     if p_id:
         if parent_task:
-            click.echo(f"Parent:   {parent_task.get('name', 'Unknown')} ({p_id})")
+            click.echo(
+                f"{_('Parent')}:   {parent_task.get('name', _('Unknown'))} ({p_id})"
+            )
         else:
-            click.echo(f"Parent:   {p_id}")
+            click.echo(f"{_('Parent')}:   {p_id}")
 
     desc = task.get("description", "")
     if desc:
-        click.echo("\nDescription:")
+        click.echo("\n" + _("Description") + ":")
         click.echo("-" * 20)
         click.echo(desc)
 
     if include_notes:
-        click.echo("\nNotes:")
+        click.echo("\n" + _("Notes") + ":")
         click.echo("-" * 20)
         if not comments:
-            click.echo("No notes found.")
+            click.echo(_("No notes found."))
         for msg in comments:
             author = msg.get("user", {}).get("username", "Unknown")
             text = msg.get("text", "")
@@ -688,7 +727,12 @@ def _show_task_offline(
             )
             return
         age_minutes = (time.time() - cached.get("cached_at", 0)) / 60
-        print_warning(f"Offline mode — data cached {int(age_minutes)}m ago.")
+        print_warning(
+            format_message(
+                "Offline mode — data cached {minutes}m ago.",
+                minutes=int(age_minutes),
+            )
+        )
         _display_task(
             cached["task"],
             cached.get("parent"),
@@ -711,8 +755,11 @@ def _show_task_offline(
                 return
             age_minutes = (time.time() - list_cached.get("timestamp", 0)) / 60
             print_warning(
-                f"Partial offline data (list cache, {int(age_minutes)}m old). "
-                "Run 'cupt prefetch' for full details and notes."
+                format_message(
+                    "Partial offline data (list cache, {minutes}m old). "
+                    "Run 'cupt prefetch' for full details and notes.",
+                    minutes=int(age_minutes),
+                )
             )
             _display_task(task, None, [], include_notes)
             return
@@ -721,8 +768,11 @@ def _show_task_offline(
         click.echo("null")
         return
     print_error(
-        f"Task {task_id} not in offline cache. "
-        "Run 'cupt prefetch' or 'cupt show <id>' online first."
+        format_message(
+            "Task {task_id} not in offline cache. "
+            "Run 'cupt prefetch' or 'cupt show <id>' online first.",
+            task_id=task_id,
+        )
     )
 
 
@@ -743,7 +793,7 @@ def prefetch_cmd(limit, workspace_id):
     active_workspace_id = workspace_id or config_workspace_id
     if not active_workspace_id:
         print_error(
-            "Workspace ID not set. Run 'cupt config --workspace-id <id>' first."
+            _("Workspace ID not set. Run 'cupt config --workspace-id <id>' first.")
         )
         return
 
@@ -753,7 +803,7 @@ def prefetch_cmd(limit, workspace_id):
     tasks = service.list_tasks(workspace_id=active_workspace_id, user_id=user_id)
 
     if not tasks:
-        print_warning("No tasks found.")
+        print_warning(_("No tasks found."))
         return
 
     if limit:
@@ -768,9 +818,17 @@ def prefetch_cmd(limit, workspace_id):
         }
     )
 
-    click.echo(f"Prefetching details for {len(tasks)} tasks...")
+    click.echo(
+        format_message("Prefetching details for {count} tasks...", count=len(tasks))
+    )
     cached_count = _prefetch_details(client, config, tasks)
-    print_success(f"Cached {cached_count}/{len(tasks)} tasks for offline use.")
+    print_success(
+        format_message(
+            "Cached {cached_count}/{total} tasks for offline use.",
+            cached_count=cached_count,
+            total=len(tasks),
+        )
+    )
 
 
 def _prefetch_details(client, config, tasks) -> int:
@@ -856,7 +914,7 @@ def complete_task(
     dry_run: bool = False,
 ):
     """Mark a task complete via TaskService."""
-    _, client, _ = get_client_context(need_workspace=False)
+    _config, client, _workspace_id = get_client_context(need_workspace=False)
     if not client:
         return
 
@@ -867,13 +925,24 @@ def complete_task(
             resolved = service.resolve_completion_status(task_id)
             list_label = resolved.get("list_name") or resolved.get("list_id")
             print_success(
-                f"Would mark task {task_id} as '{resolved['target']}' "
-                f"(list: {list_label}). No changes made."
+                format_message(
+                    "Would mark task {task_id} as '{target}' "
+                    "(list: {list_label}). No changes made.",
+                    task_id=task_id,
+                    target=resolved["target"],
+                    list_label=list_label,
+                )
             )
             return
 
         target_status = service.complete_task(task_id, note)
-        print_success(f"Task {task_id} marked as '{target_status}'!")
+        print_success(
+            format_message(
+                "Task {task_id} marked as '{target_status}'!",
+                task_id=task_id,
+                target_status=target_status,
+            )
+        )
 
         # Closing the task ends the "I'm working on this" session. Free the
         # short ID so the next reconcile slot opens up immediately, and
@@ -885,7 +954,7 @@ def complete_task(
     except ValueError as e:
         print_error(str(e))
     except Exception as e:
-        print_error(f"Failed to complete task: {e}")
+        print_error(format_message("Failed to complete task: {error}", error=e))
 
 
 # ---------------------------------------------------------------------------
@@ -918,7 +987,7 @@ def statuses_cmd(identifier, is_list, as_json):
 
 
 def show_statuses(identifier: str, is_list: bool = False, as_json: bool = False):
-    _, client, _ = get_client_context(need_workspace=False)
+    _config, client, _workspace_id = get_client_context(need_workspace=False)
     if not client:
         return
 
@@ -966,25 +1035,27 @@ def show_statuses(identifier: str, is_list: bool = False, as_json: bool = False)
             return
 
         if not statuses:
-            print_warning(f"No statuses found for list {list_id}.")
+            print_warning(
+                format_message("No statuses found for list {list_id}.", list_id=list_id)
+            )
             return
 
         label = f"{list_name} ({list_id})" if list_name else list_id
-        click.echo(f"\nList: {label}")
-        click.echo("Statuses:")
+        click.echo(f"\n{_('List')}: {label}")
+        click.echo(_("Statuses") + ":")
         # Widest name for alignment.
         name_w = max(len(s.get("status", "?")) for s in statuses)
         for s in statuses:
             name = s.get("status", "?")
             stype = s.get("type", "?")
-            marker = "  ← cupt done resolves here" if name == target else ""
+            marker = _("  ← cupt done resolves here") if name == target else ""
             click.echo(f"  - {name:<{name_w}}  [{stype}]{marker}")
         click.echo()
 
     except ValueError as e:
         print_error(str(e))
     except Exception as e:
-        print_error(f"Failed to fetch statuses: {e}")
+        print_error(format_message("Failed to fetch statuses: {error}", error=e))
 
 
 # context
@@ -1006,7 +1077,7 @@ def context_cmd(task_id, show_completed):
 
 def show_context(task_id: str, show_completed: bool = False):
     """Display a task's parent, notes, and siblings/subtasks."""
-    _, client, workspace_id = get_client_context()
+    _config, client, workspace_id = get_client_context()
     if not client:
         return
 
@@ -1014,28 +1085,28 @@ def show_context(task_id: str, show_completed: bool = False):
         service = TaskService(client)
         ctx = service.get_task_context(task_id, workspace_id, show_completed)
         if not ctx:
-            print_error(f"Task {task_id} not found")
+            print_error(format_message("Task {task_id} not found", task_id=task_id))
             return
 
         task = ctx["task"]
-        click.echo(f"\nCONTEXT FOR TASK: {task.get('name')}")
+        click.echo(f"\n{_('CONTEXT FOR TASK')}: {task.get('name')}")
         click.echo("=" * 60)
-        click.echo(f"ID:       {task.get('id')}")
+        click.echo(f"{_('ID')}:       {task.get('id')}")
         click.echo(
-            f"Status:   {task.get('status', {}).get('status', 'unknown').upper()}"
+            f"{_('Status')}:   {task.get('status', {}).get('status', 'unknown').upper()}"
         )
-        click.echo(f"Due Date: {format_date(task.get('due_date'))}")
+        click.echo(f"{_('Due Date')}: {format_date(task.get('due_date'))}")
 
         desc = task.get("description", "")
         if desc:
-            click.echo("\nDescription:")
+            click.echo("\n" + _("Description") + ":")
             click.echo("-" * 20)
             click.echo(desc)
 
-        click.echo("\nNotes:")
+        click.echo("\n" + _("Notes") + ":")
         click.echo("-" * 20)
         if not ctx["notes"]:
-            click.echo("No notes found.")
+            click.echo(_("No notes found."))
         for msg in ctx["notes"]:
             author = msg.get("user", {}).get("username", "Unknown")
             text = msg.get("text", "")
@@ -1044,33 +1115,38 @@ def show_context(task_id: str, show_completed: bool = False):
         if ctx["is_subtask"] and ctx["parent_task"]:
             p = ctx["parent_task"]
             click.echo("\n" + "=" * 60)
-            click.echo("PARENT TASK")
+            click.echo(_("PARENT TASK"))
             click.echo("=" * 60)
-            click.echo(f"Name:     {p.get('name')}")
-            click.echo(f"ID:       {p.get('id')}")
+            click.echo(f"{_('Name')}:     {p.get('name')}")
+            click.echo(f"{_('ID')}:       {p.get('id')}")
             click.echo(
-                f"Status:   {p.get('status', {}).get('status', 'unknown').upper()}"
+                f"{_('Status')}:   {p.get('status', {}).get('status', 'unknown').upper()}"
             )
             if p.get("description"):
-                click.echo("\nParent Description:")
+                click.echo("\n" + _("Parent Description") + ":")
                 click.echo("-" * 20)
                 click.echo(p.get("description"))
         else:
             click.echo("\n" + "=" * 60)
-            click.echo("PARENT TASK: (Top Level Task)")
+            click.echo(_("PARENT TASK: (Top Level Task)"))
             click.echo("=" * 60)
 
         click.echo("\n" + "=" * 60)
         if ctx["is_subtask"]:
-            click.echo(f"SIBLINGS (Subtasks of {ctx['task'].get('parent')})")
+            click.echo(
+                format_message(
+                    "SIBLINGS (Subtasks of {parent_id})",
+                    parent_id=ctx["task"].get("parent"),
+                )
+            )
         else:
-            click.echo(f"SUBTASKS (of {task_id})")
+            click.echo(format_message("SUBTASKS (of {task_id})", task_id=task_id))
         click.echo("=" * 60)
 
         if not ctx["siblings"]:
-            click.echo("No relevant subtasks found.")
+            click.echo(_("No relevant subtasks found."))
         else:
-            click.echo(f"{'ID':<12} {'Status':<12} {'Name'}")
+            click.echo(f"{_('ID'):<12} {_('Status'):<12} {_('Name')}")
             click.echo("-" * 60)
             for s in ctx["siblings"]:
                 s_id = s.get("id")
@@ -1081,4 +1157,4 @@ def show_context(task_id: str, show_completed: bool = False):
         click.echo("\n")
 
     except Exception as e:
-        print_error(f"Failed to show context: {e}")
+        print_error(format_message("Failed to show context: {error}", error=e))

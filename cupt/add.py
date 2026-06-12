@@ -23,6 +23,7 @@ from typing import Optional
 import click
 
 from cupt.context import get_client_context
+from cupt.i18n import _, format_message
 from cupt.resolver import IDResolutionError, resolve_task_id
 from cupt.state import StateManager
 from cupt.utils import (
@@ -55,8 +56,11 @@ def _resolve_link_target(
         active = state.get_active()
         if not active:
             raise IDResolutionError(
-                f"`--{label}` (without an ID) needs an active task. "
-                "Use `cupt start <id>` or pass `--{label} <id>` explicitly."
+                format_message(
+                    "`--{label}` (without an ID) needs an active task. "
+                    "Use `cupt start <id>` or pass `--{label} <id>` explicitly.",
+                    label=label,
+                )
             )
         return active["clickup_id"]
     return resolve_task_id(raw, state=state, allow_active=False)
@@ -124,7 +128,7 @@ def add_cmd(
     active one, or `--blocks <id>` / `--parent <id>` to link to a specific
     task.
     """
-    config, client, _ = get_client_context(need_workspace=False)
+    config, client, _workspace_id = get_client_context(need_workspace=False)
     if not client:
         return
 
@@ -145,8 +149,10 @@ def add_cmd(
 
     if not list_id:
         print_error(
-            "No list specified. Pass `--list <id>` or set a default with "
-            "`cupt config --default-list <id>`."
+            _(
+                "No list specified. Pass `--list <id>` or set a default with "
+                "`cupt config --default-list <id>`."
+            )
         )
         return
 
@@ -191,7 +197,7 @@ def add_cmd(
     try:
         created = client.create_task(list_id, payload)
     except Exception as e:
-        print_error(f"Failed to create task: {e}")
+        print_error(format_message("Failed to create task: {error}", error=e))
         return
 
     new_id = created.get("id")
@@ -204,8 +210,13 @@ def add_cmd(
             client.add_task_dependency(blocks_id, depends_on=new_id)
         except Exception as e:
             print_warning(
-                f"Task created ({new_id}) but failed to add dependency on "
-                f"{blocks_id}: {e}"
+                format_message(
+                    "Task created ({task_id}) but failed to add dependency on "
+                    "{blocks_id}: {error}",
+                    task_id=new_id,
+                    blocks_id=blocks_id,
+                    error=e,
+                )
             )
 
     if as_json:
@@ -213,9 +224,9 @@ def add_cmd(
         return
 
     # Concise success line — capture should feel weightless.
-    parts = [f"Created task {new_id}"]
+    parts = [format_message("Created task {task_id}", task_id=new_id)]
     if parent_id:
-        parts.append(f"(subtask of {parent_id})")
+        parts.append(format_message("(subtask of {parent_id})", parent_id=parent_id))
     if blocks_id:
-        parts.append(f"(blocks {blocks_id})")
+        parts.append(format_message("(blocks {blocks_id})", blocks_id=blocks_id))
     print_success(" ".join(parts) + f": {name}")

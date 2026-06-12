@@ -1,6 +1,7 @@
 import click
 
 from cupt.context import get_client_context
+from cupt.i18n import _, format_message
 from cupt.resolver import IDResolutionError, resolve_task_id
 from cupt.services.note_service import NoteService
 from cupt.utils import format_date, print_error, print_success, print_warning
@@ -22,7 +23,7 @@ def add_note(args):
     elif len(args) == 1:
         task_id_arg, note_text = None, args[0]
     else:
-        print_error("Usage: cupt note [<task_id>] <note_text>")
+        print_error(_("Usage: cupt note [<task_id>] <note_text>"))
         return
 
     try:
@@ -31,15 +32,15 @@ def add_note(args):
         print_error(str(e))
         return
 
-    _, client, _ = get_client_context(need_workspace=False)
+    _config, client, _workspace_id = get_client_context(need_workspace=False)
     if not client:
         return
 
     try:
         NoteService(client).add_note(task_id, note_text)
-        print_success(f"Note added to task {task_id}")
+        print_success(format_message("Note added to task {task_id}", task_id=task_id))
     except Exception as e:
-        print_error(f"Failed to add note: {e}")
+        print_error(format_message("Failed to add note: {error}", error=e))
 
 
 @click.command(name="notes")
@@ -52,7 +53,7 @@ def list_notes(task_id):
         print_error(str(e))
         return
 
-    _, client, _ = get_client_context(need_workspace=False)
+    _config, client, _workspace_id = get_client_context(need_workspace=False)
     if not client:
         return
 
@@ -60,14 +61,16 @@ def list_notes(task_id):
         comments = NoteService(client).list_notes(task_id)
 
         if not comments:
-            print_warning(f"No notes found for task {task_id}")
+            print_warning(
+                format_message("No notes found for task {task_id}", task_id=task_id)
+            )
             return
 
-        click.echo(f"\nNotes for task {task_id}:")
+        click.echo("\n" + format_message("Notes for task {task_id}:", task_id=task_id))
         click.echo("=" * 80)
 
         for msg in comments:
-            author = msg.get("user", {}).get("username", "Unknown")
+            author = msg.get("user", {}).get("username", _("Unknown"))
             text = msg.get("text", "")
             date = format_date(msg.get("date"))
             click.echo(f"[{date}] {author}:")
@@ -76,4 +79,4 @@ def list_notes(task_id):
             click.echo("-" * 20)
 
     except Exception as e:
-        print_error(f"Failed to list notes: {e}")
+        print_error(format_message("Failed to list notes: {error}", error=e))

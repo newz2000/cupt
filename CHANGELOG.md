@@ -13,6 +13,9 @@ user impact are not listed.
 ### Changed
 - Documented local real-workspace performance verification and corrected
   `--all --team` timing guidance.
+- Marked the package as `1.0.0b1` for beta release preparation.
+- Expanded the Spanish beta localization proof of concept with translated CLI
+  command help, common human-facing messages, and catalog drift checks.
 
 ## [1.0.0] — 2026-06-11
 

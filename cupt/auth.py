@@ -11,18 +11,19 @@ from urllib.parse import parse_qs, urlparse
 import requests
 
 from cupt.config import ConfigManager
+from cupt.i18n import _, format_message
 
 
 def print_info(message: str):
-    print(f"ℹ️  {message}")
+    print(f"ℹ️  {_(message)}")
 
 
 def print_error(message: str):
-    print(f"❌ {message}")
+    print(f"❌ {_(message)}")
 
 
 def print_success(message: str):
-    print(f"✅ {message}")
+    print(f"✅ {_(message)}")
 
 
 class OAuthCallbackHandler(BaseHTTPRequestHandler):
@@ -105,15 +106,17 @@ class OAuthManager:
         # Use OAuth v2 authorize endpoint with proper encoding
         auth_url = f"https://app.clickup.com/api?client_id={self.client_id}&redirect_uri={redirect_uri}"
 
-        print_info("Opening browser for authentication...")
-        print_info(f"If browser doesn't open, visit: {auth_url}")
+        print_info(_("Opening browser for authentication..."))
+        print_info(
+            format_message("If browser doesn't open, visit: {url}", url=auth_url)
+        )
 
         # Open browser
         try:
             webbrowser.open(auth_url)
         except Exception as e:
-            print_error(f"Could not open browser: {e}")
-            print_info("Please manually visit the URL above")
+            print_error(format_message("Could not open browser: {error}", error=e))
+            print_info(_("Please manually visit the URL above"))
 
         # Start local server to handle callback
         return self._start_callback_server()
@@ -125,7 +128,12 @@ class OAuthManager:
             return OAuthCallbackHandler(self, *args)
 
         try:
-            print_info(f"Waiting for authentication on port {self.callback_port}...")
+            print_info(
+                format_message(
+                    "Waiting for authentication on port {port}...",
+                    port=self.callback_port,
+                )
+            )
             server = HTTPServer(("localhost", self.callback_port), handler)
             server.timeout = 120  # 2 minute timeout
 
@@ -140,15 +148,21 @@ class OAuthManager:
             if self.received and self.auth_code:
                 return self._exchange_code_for_tokens(self.auth_code)
             else:
-                print_error("Authentication timed out")
+                print_error(_("Authentication timed out"))
                 return None
 
         except OSError as e:
             if "Address already in use" in str(e):
-                print_error(f"Port {self.callback_port} is already in use")
-                print_error("Please stop any other applications using this port")
+                print_error(
+                    format_message(
+                        "Port {port} is already in use", port=self.callback_port
+                    )
+                )
+                print_error(_("Please stop any other applications using this port"))
             else:
-                print_error(f"Failed to start callback server: {e}")
+                print_error(
+                    format_message("Failed to start callback server: {error}", error=e)
+                )
             return None
 
     def _exchange_code_for_tokens(self, code: str) -> Optional[Dict[str, Any]]:
@@ -166,10 +180,21 @@ class OAuthManager:
         try:
             response = requests.post(token_url, data=data)
 
-            print_info(f"Token exchange response status: {response.status_code}")
+            print_info(
+                format_message(
+                    "Token exchange response status: {status}",
+                    status=response.status_code,
+                )
+            )
 
             if response.status_code != 200:
-                print_error(f"HTTP {response.status_code}: {response.text}")
+                print_error(
+                    format_message(
+                        "HTTP {status}: {body}",
+                        status=response.status_code,
+                        body=response.text,
+                    )
+                )
                 return None
 
             response.raise_for_status()
@@ -184,18 +209,22 @@ class OAuthManager:
                 # Store client identifier (do not persist client_secret)
                 self.config.set("auth.client_id", self.client_id)
 
-                print_success("Authentication successful!")
+                print_success(_("Authentication successful!"))
                 return tokens
             else:
-                print_error("No access token received")
-                print_error(f"Response: {tokens}")
+                print_error(_("No access token received"))
+                print_error(format_message("Response: {response}", response=tokens))
                 return None
 
         except requests.exceptions.RequestException as e:
-            print_error(f"Failed to exchange code for tokens: {e}")
+            print_error(
+                format_message("Failed to exchange code for tokens: {error}", error=e)
+            )
             return None
         except ValueError as e:
-            print_error(f"Invalid response from token endpoint: {e}")
+            print_error(
+                format_message("Invalid response from token endpoint: {error}", error=e)
+            )
             return None
 
     def refresh_tokens(self) -> bool:
@@ -203,7 +232,7 @@ class OAuthManager:
         refresh_token = self.config.get("auth.refresh_token")
 
         if not refresh_token:
-            print_error("No refresh token available")
+            print_error(_("No refresh token available"))
             return False
 
         token_url = "https://api.clickup.com/api/v2/oauth/token"
@@ -226,21 +255,23 @@ class OAuthManager:
                 if "refresh_token" in tokens:
                     self.config.set("auth.refresh_token", tokens["refresh_token"])
 
-                print_success("Tokens refreshed successfully")
+                print_success(_("Tokens refreshed successfully"))
                 return True
             else:
-                print_error("No access token received during refresh")
+                print_error(_("No access token received during refresh"))
                 return False
 
         except requests.exceptions.RequestException as e:
-            print_error(f"Failed to refresh tokens: {e}")
+            print_error(format_message("Failed to refresh tokens: {error}", error=e))
             return False
         except ValueError as e:
-            print_error(f"Invalid response during refresh: {e}")
+            print_error(
+                format_message("Invalid response during refresh: {error}", error=e)
+            )
             return False
 
     def logout(self):
         """Clear authentication data"""
         self.config.set("auth.access_token", None)
         self.config.set("auth.refresh_token", None)
-        print_success("Logged out successfully")
+        print_success(_("Logged out successfully"))

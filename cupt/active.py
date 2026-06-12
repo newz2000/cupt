@@ -10,6 +10,7 @@ from typing import Optional
 import click
 
 from cupt.context import get_client_context
+from cupt.i18n import _, format_message
 from cupt.resolver import IDResolutionError, resolve_task_id
 from cupt.state import StateManager
 from cupt.utils import is_interactive, print_error, print_success, print_warning
@@ -19,8 +20,11 @@ def _require_interactive(command: str) -> bool:
     if is_interactive():
         return True
     print_error(
-        f"`cupt {command}` is interactive-only "
-        "(set CUPT_INTERACTIVE=1 to force, or pass --interactive)."
+        format_message(
+            "`cupt {command}` is interactive-only "
+            "(set CUPT_INTERACTIVE=1 to force, or pass --interactive).",
+            command=command,
+        )
     )
     return False
 
@@ -50,20 +54,26 @@ def start_cmd(task_id: Optional[str]):
     try:
         task = client.get_task(resolved)
     except Exception as e:
-        print_error(f"Failed to look up task: {e}")
+        print_error(format_message("Failed to look up task: {error}", error=e))
         return
 
     if not task:
-        print_error(f"Task {resolved} not found.")
+        print_error(format_message("Task {task_id} not found.", task_id=resolved))
         return
 
     name = task.get("name") or resolved
     previous = state.set_active(resolved, name)
     if previous and previous.get("clickup_id") != resolved:
         print_warning(
-            f"Replaced active task {previous['clickup_id']} — {previous.get('name', '')}"
+            format_message(
+                "Replaced active task {task_id} — {name}",
+                task_id=previous["clickup_id"],
+                name=previous.get("name", ""),
+            )
         )
-    print_success(f"Active: {resolved} — {name}")
+    print_success(
+        format_message("Active: {task_id} — {name}", task_id=resolved, name=name)
+    )
 
 
 @click.command(name="stop")
@@ -74,9 +84,15 @@ def stop_cmd():
     state = StateManager()
     previous = state.clear_active()
     if previous:
-        print_success(f"Stopped: {previous['clickup_id']} — {previous.get('name', '')}")
+        print_success(
+            format_message(
+                "Stopped: {task_id} — {name}",
+                task_id=previous["clickup_id"],
+                name=previous.get("name", ""),
+            )
+        )
     else:
-        print_warning("No active task.")
+        print_warning(_("No active task."))
 
 
 @click.command(name="active")
@@ -90,11 +106,16 @@ def active_cmd():
     state = StateManager()
     active = state.get_active()
     if not active:
-        click.echo("No active task. Use `cupt start <id>` to set one.")
+        click.echo(_("No active task. Use `cupt start <id>` to set one."))
         return
     short = state.short_id_for(active["clickup_id"])
     short_prefix = f"[{short}] " if short else ""
     click.echo(
-        f"{short_prefix}{active['clickup_id']}  {active.get('name', '')}  "
-        f"· started {active.get('started_at', '')}"
+        format_message(
+            "{prefix}{task_id}  {name}  · started {started_at}",
+            prefix=short_prefix,
+            task_id=active["clickup_id"],
+            name=active.get("name", ""),
+            started_at=active.get("started_at", ""),
+        )
     )

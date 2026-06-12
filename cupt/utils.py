@@ -12,6 +12,8 @@ import sys
 from datetime import datetime
 from typing import Any, Optional
 
+from cupt.i18n import _
+
 
 def parse_duration(duration_str: str) -> Optional[int]:
     """
@@ -141,7 +143,7 @@ def parse_due_date(value: Optional[str]) -> Optional[int]:
 def format_date(timestamp: Optional[Any]) -> str:
     """Format timestamp to readable date"""
     if not timestamp:
-        return "No date"
+        return _("No date")
 
     try:
         # ClickUp timestamps are sometimes strings in some API versions/fields
@@ -149,7 +151,7 @@ def format_date(timestamp: Optional[Any]) -> str:
         dt = datetime.fromtimestamp(ts / 1000)
         return dt.strftime("%Y-%m-%d %H:%M")
     except (ValueError, OSError, TypeError):
-        return "Invalid date"
+        return _("Invalid date")
 
 
 def truncate_text(text: str, max_length: Optional[int] = 50) -> str:
@@ -198,12 +200,12 @@ def _decorate(prefix_tty: str, prefix_plain: str, message: str) -> str:
 
 def print_info(message: str):
     """Print info message to stderr."""
-    print(_decorate("ℹ️", "INFO", message), file=sys.stderr)
+    print(_decorate("ℹ️", _("INFO"), _(message)), file=sys.stderr)
 
 
 def print_error(message: str):
     """Print error message to stderr."""
-    print(_decorate("❌", "ERROR", message), file=sys.stderr)
+    print(_decorate("❌", _("ERROR"), _(message)), file=sys.stderr)
 
 
 def print_success(message: str):
@@ -212,12 +214,12 @@ def print_success(message: str):
     Success messages are not data — they shouldn't pollute stdout when the
     user pipes a command (e.g. `cupt list --json | jq ...`).
     """
-    print(_decorate("✅", "OK", message), file=sys.stderr)
+    print(_decorate("✅", _("OK"), _(message)), file=sys.stderr)
 
 
 def print_warning(message: str):
     """Print warning message to stderr."""
-    print(_decorate("⚠️", "WARN", message), file=sys.stderr)
+    print(_decorate("⚠️", _("WARN"), _(message)), file=sys.stderr)
 
 
 _INTERACTIVE_OVERRIDE: Optional[bool] = None

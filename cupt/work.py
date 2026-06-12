@@ -6,6 +6,7 @@ from typing import Any, Dict, Iterable, List, Optional
 import click
 
 from cupt.context import get_client_context
+from cupt.i18n import _, format_message
 from cupt.services.task_service import TaskService
 from cupt.services.time_service import TimeService
 from cupt.state import StateManager
@@ -14,7 +15,7 @@ from cupt.utils import is_interactive, print_error, print_success, print_warning
 
 
 def _task_name(task: Dict[str, Any]) -> str:
-    return task.get("name") or task.get("id", "Unknown task")
+    return task.get("name") or task.get("id", _("Unknown task"))
 
 
 @click.command(name="work")
@@ -86,12 +87,12 @@ def work_tasks(
 
     if not is_interactive():
         print_error(
-            "`cupt work` is interactive-only. Use `cupt work --json` for scripts."
+            _("`cupt work` is interactive-only. Use `cupt work --json` for scripts.")
         )
         return tasks
 
     if not tasks:
-        print_warning("No tasks matched the work queue.")
+        print_warning(_("No tasks matched the work queue."))
         return []
 
     _run_focus_loop(client, workspace_id, tasks)
@@ -106,7 +107,15 @@ def _run_focus_loop(client, workspace_id: str, tasks: List[Dict[str, Any]]) -> N
 
     for index, task in enumerate(tasks, start=1):
         task_id = task["id"]
-        click.echo(f"\nTask {index}/{len(tasks)}: {_task_name(task)}")
+        click.echo(
+            "\n"
+            + format_message(
+                "Task {index}/{total}: {name}",
+                index=index,
+                total=len(tasks),
+                name=_task_name(task),
+            )
+        )
         click.echo("=" * 60)
         try:
             detail = client.get_task(task_id)
@@ -116,7 +125,7 @@ def _run_focus_loop(client, workspace_id: str, tasks: List[Dict[str, Any]]) -> N
 
         while True:
             choice = (
-                click.prompt("[w]ork / [s]kip / [d]one / [q]uit", default="w")
+                click.prompt(_("[w]ork / [s]kip / [d]one / [q]uit"), default="w")
                 .strip()
                 .lower()[:1]
             )
@@ -124,17 +133,29 @@ def _run_focus_loop(client, workspace_id: str, tasks: List[Dict[str, Any]]) -> N
                 previous = state.set_active(task_id, _task_name(task))
                 if previous and previous.get("clickup_id") != task_id:
                     print_warning(
-                        f"Replaced active task {previous['clickup_id']} — {previous.get('name', '')}"
+                        format_message(
+                            "Replaced active task {task_id} — {name}",
+                            task_id=previous["clickup_id"],
+                            name=previous.get("name", ""),
+                        )
                     )
                 try:
                     if not timer.get_running_timer():
                         timer.start_timer(task_id)
                 except Exception as exc:
-                    print_warning(f"Could not start timer: {exc}")
-                print_success(f"Active: {task_id} — {_task_name(task)}")
+                    print_warning(
+                        format_message("Could not start timer: {error}", error=exc)
+                    )
+                print_success(
+                    format_message(
+                        "Active: {task_id} — {name}",
+                        task_id=task_id,
+                        name=_task_name(task),
+                    )
+                )
                 break
             if choice == "s":
-                print_warning(f"Skipped: {task_id}")
+                print_warning(format_message("Skipped: {task_id}", task_id=task_id))
                 break
             if choice == "d":
                 try:
@@ -145,12 +166,22 @@ def _run_focus_loop(client, workspace_id: str, tasks: List[Dict[str, Any]]) -> N
                         if timer.get_running_timer():
                             timer.stop_timer()
                     except Exception as exc:
-                        print_warning(f"Could not stop timer: {exc}")
-                    print_success(f"Task {task_id} marked as '{target}'!")
+                        print_warning(
+                            format_message("Could not stop timer: {error}", error=exc)
+                        )
+                    print_success(
+                        format_message(
+                            "Task {task_id} marked as '{target_status}'!",
+                            task_id=task_id,
+                            target_status=target,
+                        )
+                    )
                 except Exception as exc:
-                    print_error(f"Failed to complete task: {exc}")
+                    print_error(
+                        format_message("Failed to complete task: {error}", error=exc)
+                    )
                 break
             if choice == "q":
-                print_warning("Work session ended.")
+                print_warning(_("Work session ended."))
                 return
-            print_warning("Choose w, s, d, or q.")
+            print_warning(_("Choose w, s, d, or q."))

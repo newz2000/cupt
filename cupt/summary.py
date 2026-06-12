@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional
 import click
 
 from cupt.context import get_client_context
+from cupt.i18n import _, format_message
 from cupt.services.task_service import TaskService
 from cupt.utils import (
     format_date,
@@ -19,6 +20,11 @@ from cupt.utils import (
 # "  {id:<12} {status:<14} {due:<18} {name}" -> 2+12+1+14+1+18+1 = 49 fixed
 _SUMMARY_FIXED_WIDTH = 30
 _SUMMARY_FIXED_WIDTH_WITH_DATE = 49
+
+
+def _task_count(count: int) -> str:
+    template = "{count} task" if count == 1 else "{count} tasks"
+    return format_message(template, count=count)
 
 
 @click.command(name="summary")
@@ -98,7 +104,7 @@ def show_summary(mine: bool = True, as_json: bool = False) -> Optional[Dict[str,
             running_timer = fut_timer.result()
 
     except Exception as e:
-        print_error(f"Failed to fetch summary data: {e}")
+        print_error(format_message("Failed to fetch summary data: {error}", error=e))
         return None
 
     total_ms = sum(int(e.get("duration", 0)) for e in time_entries)
@@ -124,8 +130,8 @@ def show_summary(mine: bool = True, as_json: bool = False) -> Optional[Dict[str,
 def _render_summary(payload: Dict[str, Any]) -> None:
     """Render summary data for humans."""
     day_label = datetime.now().strftime("%A, %B %-d, %Y")
-    scope = "Your" if payload["scope"] == "mine" else "Workspace"
-    click.echo(f"\n{scope.upper()} SUMMARY  —  {day_label}")
+    scope = _("Your") if payload["scope"] == "mine" else _("Workspace")
+    click.echo(f"\n{scope.upper()} {_('SUMMARY')}  —  {day_label}")
     click.echo("=" * 60)
 
     running_timer = payload["running_timer"]
@@ -133,10 +139,10 @@ def _render_summary(payload: Dict[str, Any]) -> None:
     overdue = payload["overdue"]
     completed_today = payload["completed_today"]
 
-    click.echo("\nTIME TRACKED TODAY")
+    click.echo("\n" + _("TIME TRACKED TODAY"))
     click.echo("-" * 20)
     total_ms = payload["time_tracked_ms"]
-    click.echo(f"  Total:   {format_duration(total_ms) if total_ms else '0m'}")
+    click.echo(f"  {_('Total')}:   {format_duration(total_ms) if total_ms else '0m'}")
     if running_timer:
         start_ms = int(running_timer.get("start", 0))
         elapsed_ms = (
@@ -144,38 +150,55 @@ def _render_summary(payload: Dict[str, Any]) -> None:
         )
         task_obj = running_timer.get("task") or {}
         timer_name = task_obj.get("name") or running_timer.get(
-            "task_id", "Unknown task"
+            "task_id", _("Unknown task")
         )
         click.echo(
-            f"  Running: {timer_name} (started {format_duration(elapsed_ms)} ago)"
+            format_message(
+                "  Running: {timer_name} (started {elapsed} ago)",
+                timer_name=timer_name,
+                elapsed=format_duration(elapsed_ms),
+            )
         )
     else:
-        click.echo("  Running: none")
+        click.echo(_("  Running: none"))
 
     click.echo(
-        f"\nDUE TODAY  ({len(due_today)} task{'s' if len(due_today) != 1 else ''})"
+        "\n"
+        + format_message(
+            "DUE TODAY  ({task_count})",
+            task_count=_task_count(len(due_today)),
+        )
     )
     click.echo("-" * 20)
     if not due_today:
-        click.echo("  Nothing due today.")
+        click.echo(_("  Nothing due today."))
     else:
         for t in due_today:
             _print_task_line(t)
 
-    click.echo(f"\nOVERDUE  ({len(overdue)} task{'s' if len(overdue) != 1 else ''})")
+    click.echo(
+        "\n"
+        + format_message(
+            "OVERDUE  ({task_count})", task_count=_task_count(len(overdue))
+        )
+    )
     click.echo("-" * 20)
     if not overdue:
-        click.echo("  Nothing overdue.")
+        click.echo(_("  Nothing overdue."))
     else:
         for t in overdue:
             _print_task_line(t, show_date=True)
 
     click.echo(
-        f"\nCOMPLETED TODAY  ({len(completed_today)} task{'s' if len(completed_today) != 1 else ''})"
+        "\n"
+        + format_message(
+            "COMPLETED TODAY  ({task_count})",
+            task_count=_task_count(len(completed_today)),
+        )
     )
     click.echo("-" * 20)
     if not completed_today:
-        click.echo("  Nothing completed today.")
+        click.echo(_("  Nothing completed today."))
     else:
         for t in completed_today:
             _print_task_line(t)
@@ -186,7 +209,7 @@ def _render_summary(payload: Dict[str, Any]) -> None:
 def _print_task_line(task: Dict[str, Any], show_date: bool = False) -> None:
     task_id = task.get("id", "")
     status = task.get("status", {}).get("status", "unknown").upper()
-    name = task.get("name", "No name")
+    name = task.get("name", _("No name"))
 
     width = get_terminal_width()
     if width is None:
