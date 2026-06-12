@@ -8,6 +8,7 @@ from typing import Optional, Set
 ROOT = Path(__file__).resolve().parents[1]
 POT = ROOT / "cupt" / "locale" / "cupt.pot"
 LOCALE_ROOT = ROOT / "cupt" / "locale"
+REQUIRED_LOCALES = ("es_LA", "es_ES", "fr", "de", "it", "pt_BR")
 CALL_NAMES = {
     "_",
     "format_message",
@@ -85,6 +86,11 @@ def _source_msgids() -> Set[str]:
 
 def main() -> int:
     missing = [str(path.relative_to(ROOT)) for path in (POT,) if not path.exists()]
+    for locale in REQUIRED_LOCALES:
+        po = LOCALE_ROOT / locale / "LC_MESSAGES" / "cupt.po"
+        if not po.exists():
+            missing.append(str(po.relative_to(ROOT)))
+
     po_files = sorted(LOCALE_ROOT.glob("*/LC_MESSAGES/cupt.po"))
     if not po_files:
         missing.append("cupt/locale/*/LC_MESSAGES/cupt.po")

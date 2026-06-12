@@ -235,20 +235,27 @@ You now know enough to be productive. The command reference below is a quicker r
 
 `cupt` is usable as a dependency in your own Python code. Importing it does no I/O — no config directory is created, no network calls happen until you make one explicitly.
 
-### Spanish beta localization
+### Beta localization
 
-`cupt` includes a beta Spanish CLI translation as a proof of concept:
+`cupt` includes beta CLI localization catalogs for ClickUp's supported app
+languages:
 
 ```bash
-cupt --lang es --help
-CUPT_LANG=es cupt list --help
+cupt --lang es_LA --help
+CUPT_LANG=pt_BR cupt list --help
 ```
 
-The Spanish catalog is AI-generated and intended for beta feedback. Command
-names, flags, JSON keys, IDs, task content, and low-level API error payloads stay
-literal so scripts remain stable and troubleshooting stays searchable. Click's
-built-in help headings such as `Usage`, `Options`, and `Commands` may still
-appear in English.
+Available catalogs are `es_LA`, `es_ES`, `fr`, `de`, `it`, and `pt_BR`.
+The `es`, `es-419`, and `es-LA` aliases resolve to Latin American Spanish;
+`pt-BR` resolves to `pt_BR`.
+
+The Spanish catalogs are AI-generated beta translations intended for feedback.
+The French, German, Italian, and Brazilian Portuguese catalogs are present so
+reviewers can work against the same `.pot` source and currently fall back to
+English for most strings. Command names, flags, JSON keys, IDs, task content,
+and low-level API error payloads stay literal so scripts remain stable and
+troubleshooting stays searchable. Click's built-in help headings such as
+`Usage`, `Options`, and `Commands` may still appear in English.
 
 ```python
 from cupt import ClickUpClient, TaskService, APIError

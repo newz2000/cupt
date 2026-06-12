@@ -1,0 +1,928 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: cupt 1.0 beta\n"
+"Language: pt_BR\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "  Nothing completed today."
+msgstr ""
+
+msgid "  Nothing due today."
+msgstr ""
+
+msgid "  Nothing overdue."
+msgstr ""
+
+msgid "  Running: none"
+msgstr ""
+
+msgid "  Running: {timer_name} (started {elapsed} ago)"
+msgstr ""
+
+msgid "  ← cupt done resolves here"
+msgstr ""
+
+msgid "'{selector}' matches {count} attachments — be more specific or use an index"
+msgstr ""
+
+msgid "(blocks {blocks_id})"
+msgstr ""
+
+msgid "(subtask of {parent_id})"
+msgstr ""
+
+msgid "(team filter: searched {pages} pages in {elapsed:.1f}s"
+msgstr ""
+
+msgid "1. Go to: https://app.clickup.com/settings/apps"
+msgstr ""
+
+msgid "1. OAuth (recommended for teams)"
+msgstr ""
+
+msgid "2. Click 'Create new app'"
+msgstr ""
+
+msgid "2. Copy your Personal API Token (starts with 'pk_')"
+msgstr ""
+
+msgid "2. Personal API Token (simpler, individual use)"
+msgstr ""
+
+msgid "3. Set redirect URL to: http://localhost:4321"
+msgstr ""
+
+msgid "4. Copy your Client ID and Client Secret"
+msgstr ""
+
+msgid "; hit page cap — pair with --tag for full coverage"
+msgstr ""
+
+msgid "API Token is required"
+msgstr ""
+
+msgid "Active: {prefix}{task_id} — {name}"
+msgstr ""
+
+msgid "Active: {task_id} — {name}"
+msgstr ""
+
+msgid "Add a completion note"
+msgstr ""
+
+msgid ""
+"Add a new task. One required positional: the task name.\n"
+"\n"
+"\n"
+"Interactive defaults: list inferred from active task; assignee = you.\n"
+"Pass `--blocks this` / `--parent this` to link the new task to the\n"
+"active one, or `--blocks <id>` / `--parent <id>` to link to a specific\n"
+"task."
+msgstr ""
+
+msgid ""
+"Add a quick note (comment) to a task.\n"
+"\n"
+"Two forms:\n"
+"\n"
+"\n"
+"  cupt note <task_id> <note_text>   # explicit\n"
+"  cupt note <note_text>             # uses active task (interactive only)"
+msgstr ""
+
+msgid "Add a tag to a task"
+msgstr ""
+
+msgid ""
+"Add manual time entry to a task.\n"
+"\n"
+"Forms:\n"
+"\n"
+"\n"
+"  cupt time add <task_id> <duration>   # explicit\n"
+"  cupt time add <duration>             # uses active task (interactive)"
+msgstr ""
+
+msgid "Add or remove task tags"
+msgstr ""
+
+msgid "Added {duration} to task {task_id}"
+msgstr ""
+
+msgid "Already authenticated with Personal API Token"
+msgstr ""
+
+msgid "Assignee"
+msgstr ""
+
+msgid "Attach:   {count} file(s) — use 'cupt attach list {task_id}'"
+msgstr ""
+
+msgid "Attached '{title}' to {task_id}"
+msgstr ""
+
+msgid "Attachment has no download URL."
+msgstr ""
+
+msgid "Auth Method"
+msgstr ""
+
+msgid "Authenticate with ClickUp using OAuth"
+msgstr ""
+
+msgid "Authenticated"
+msgstr ""
+
+msgid "Authenticated as {username}"
+msgstr ""
+
+msgid "Authenticated as: {username}"
+msgstr ""
+
+msgid "Authenticated with Personal API Token"
+msgstr ""
+
+msgid "Authentication failed"
+msgstr ""
+
+msgid "Authentication successful!"
+msgstr ""
+
+msgid "Authentication timed out"
+msgstr ""
+
+msgid "COMPLETED TODAY  ({task_count})"
+msgstr ""
+
+msgid "CONTEXT FOR TASK"
+msgstr ""
+
+msgid "CUPT - ClickUp Task Management CLI"
+msgstr "CUPT - CLI de gerenciamento de tarefas do ClickUp"
+
+msgid "Cached {cached_count}/{total} tasks for offline use."
+msgstr ""
+
+msgid "Choose authentication method:"
+msgstr ""
+
+msgid "Choose w, s, d, or q."
+msgstr ""
+
+msgid "Clear authentication data"
+msgstr ""
+
+msgid "Clear persistent parent name cache"
+msgstr ""
+
+msgid "Clear the active task without marking it done."
+msgstr ""
+
+msgid "Client ID and Client Secret are required"
+msgstr ""
+
+msgid "Could not open browser: {error}"
+msgstr ""
+
+msgid "Could not start timer: {error}"
+msgstr ""
+
+msgid "Could not stop timer: {error}"
+msgstr ""
+
+msgid "Could not write to {path}: {error}"
+msgstr ""
+
+msgid "Created task {task_id}"
+msgstr ""
+
+msgid "Current configuration:"
+msgstr ""
+
+msgid "DUE TODAY  ({task_count})"
+msgstr ""
+
+msgid "Default List ID"
+msgstr ""
+
+msgid "Default list ID set to: {list_id}"
+msgstr ""
+
+msgid "Default workspace: {workspace}"
+msgstr ""
+
+msgid "Description"
+msgstr ""
+
+msgid "Description for the time entry"
+msgstr ""
+
+msgid "Download an attachment by 1-based index or filename substring"
+msgstr ""
+
+msgid "Download failed: {error}"
+msgstr ""
+
+msgid "Downloaded {title} -> {path}"
+msgstr ""
+
+msgid "Due"
+msgstr "Vencimento"
+
+msgid "Due Date"
+msgstr ""
+
+msgid "Due date: today, tomorrow, +Nd, +Nw, +Nh, YYYY-MM-DD, YYYY-MM-DD HH:MM, or raw epoch ms."
+msgstr ""
+
+msgid "ERROR"
+msgstr ""
+
+msgid "Enable debug logging"
+msgstr ""
+
+msgid "Enter choice (1 or 2)"
+msgstr ""
+
+msgid "Enter your ClickUp Client ID"
+msgstr ""
+
+msgid "Enter your ClickUp Client Secret"
+msgstr ""
+
+msgid "Enter your Personal API Token"
+msgstr ""
+
+msgid "Est"
+msgstr ""
+
+msgid "Exclude tasks with this tag (repeatable)"
+msgstr ""
+
+msgid "Failed to add note: {error}"
+msgstr ""
+
+msgid "Failed to add tag: {error}"
+msgstr ""
+
+msgid "Failed to add time entry: {error}"
+msgstr ""
+
+msgid "Failed to complete task: {error}"
+msgstr ""
+
+msgid "Failed to create task: {error}"
+msgstr ""
+
+msgid "Failed to exchange code for tokens: {error}"
+msgstr ""
+
+msgid "Failed to fetch statuses: {error}"
+msgstr ""
+
+msgid "Failed to fetch summary data: {error}"
+msgstr ""
+
+msgid "Failed to fetch task: {error}"
+msgstr ""
+
+msgid "Failed to fetch teams: {error}"
+msgstr ""
+
+msgid "Failed to get status: {error}"
+msgstr ""
+
+msgid "Failed to get timer status: {error}"
+msgstr ""
+
+msgid "Failed to get user info: {error}"
+msgstr ""
+
+msgid "Failed to list notes: {error}"
+msgstr ""
+
+msgid "Failed to list tasks: {error}"
+msgstr ""
+
+msgid "Failed to look up task: {error}"
+msgstr ""
+
+msgid "Failed to refresh tokens: {error}"
+msgstr ""
+
+msgid "Failed to remove tag: {error}"
+msgstr ""
+
+msgid "Failed to show context: {error}"
+msgstr ""
+
+msgid "Failed to show task: {error}"
+msgstr ""
+
+msgid "Failed to start callback server: {error}"
+msgstr ""
+
+msgid "Failed to start timer: {error}"
+msgstr ""
+
+msgid "Failed to stop timer: {error}"
+msgstr ""
+
+msgid "Failed to upload attachment: {error}"
+msgstr ""
+
+msgid "Folder"
+msgstr ""
+
+msgid "Force interactive (short IDs + active task) or non-interactive mode. Default: enabled when stdout is a TTY."
+msgstr ""
+
+msgid "HTTP {status}: {body}"
+msgstr ""
+
+msgid "Hide subtasks from the list"
+msgstr ""
+
+msgid "ID"
+msgstr ""
+
+msgid "INFO"
+msgstr ""
+
+msgid "If browser doesn't open, visit: {url}"
+msgstr ""
+
+msgid "Include closed tasks"
+msgstr ""
+
+msgid "Include completed subtasks"
+msgstr ""
+
+msgid "Invalid date"
+msgstr ""
+
+msgid "Invalid duration format: {duration}"
+msgstr ""
+
+msgid "Invalid response during refresh: {error}"
+msgstr ""
+
+msgid "Invalid response from token endpoint: {error}"
+msgstr ""
+
+msgid "Language code for CLI messages (for example: en, es)."
+msgstr ""
+
+msgid "Limit results"
+msgstr ""
+
+msgid "List"
+msgstr ""
+
+msgid ""
+"List ClickUp teams (user-groups) in the workspace.\n"
+"\n"
+"Note: ClickUp calls user-groups \"teams\" in its UI; the underlying\n"
+"REST URL is `/group` for historical reasons."
+msgstr ""
+
+msgid "List all notes (comments) for a task. Falls back to the active task."
+msgstr ""
+
+msgid "List attachments on a task"
+msgstr ""
+
+msgid "List tasks with optional filters"
+msgstr "Listar tarefas com filtros opcionais"
+
+msgid "List, download, and upload task attachments"
+msgstr ""
+
+msgid "Logged out successfully"
+msgstr ""
+
+msgid "Make the new task a blocker on the given task (it will depend on the new one). Pass an ID, a short ID, or `this` to use the active task."
+msgstr ""
+
+msgid "Make the new task a subtask. Pass an ID, a short ID, or `this` to use the active task."
+msgstr ""
+
+msgid "Manage configuration"
+msgstr ""
+
+msgid ""
+"Mark a task as active for this session.\n"
+"\n"
+"Subsequent commands (`note`, `done`, `show`, ...) default to it until\n"
+"`cupt done` or `cupt stop` clears it. Interactive sessions only."
+msgstr ""
+
+msgid "Mark a task as complete. Falls back to the active task."
+msgstr ""
+
+msgid "Max tasks to prefetch"
+msgstr ""
+
+msgid "Maximum tasks to queue"
+msgstr ""
+
+msgid "Members"
+msgstr ""
+
+msgid "N/A"
+msgstr ""
+
+msgid "NONE"
+msgstr ""
+
+msgid "Name"
+msgstr "Nome"
+
+msgid "No"
+msgstr ""
+
+msgid "No access token received"
+msgstr ""
+
+msgid "No access token received during refresh"
+msgstr ""
+
+msgid "No active task."
+msgstr ""
+
+msgid "No active task. Last list refresh: {last}"
+msgstr ""
+
+msgid "No active task. Use `cupt start <id>` to set one."
+msgstr ""
+
+msgid "No active tasks found matching criteria."
+msgstr ""
+
+msgid "No attachment matches '{selector}'."
+msgstr ""
+
+msgid "No attachments on {task_id}."
+msgstr ""
+
+msgid "No cached data available. Run 'cupt list' while online first."
+msgstr ""
+
+msgid "No date"
+msgstr ""
+
+msgid "No list specified. Pass `--list <id>` or set a default with `cupt config --default-list <id>`."
+msgstr ""
+
+msgid "No name"
+msgstr ""
+
+msgid "No notes found for task {task_id}"
+msgstr ""
+
+msgid "No notes found."
+msgstr ""
+
+msgid "No refresh token available"
+msgstr ""
+
+msgid "No relevant subtasks found."
+msgstr ""
+
+msgid "No statuses found for list {list_id}."
+msgstr ""
+
+msgid "No tasks found."
+msgstr ""
+
+msgid "No tasks in cache."
+msgstr ""
+
+msgid "No tasks matched the filter."
+msgstr "Nenhuma tarefa correspondeu ao filtro."
+
+msgid "No tasks matched the work queue."
+msgstr ""
+
+msgid "No teams found in this workspace."
+msgstr ""
+
+msgid "No timer is currently running"
+msgstr ""
+
+msgid "No timer is currently running."
+msgstr ""
+
+msgid "No workspaces found - you may need to join one in ClickUp"
+msgstr ""
+
+msgid "Not authenticated. Run 'cupt auth' first."
+msgstr ""
+
+msgid "Not authenticated. Run 'cupt auth' to authenticate."
+msgstr "Não autenticado. Execute 'cupt auth' para autenticar."
+
+msgid "Not set"
+msgstr ""
+
+msgid "Note added to task {task_id}"
+msgstr ""
+
+msgid "Note: {message}"
+msgstr ""
+
+msgid "Notes"
+msgstr ""
+
+msgid "Notes for task {task_id}:"
+msgstr ""
+
+msgid "OAuth"
+msgstr ""
+
+msgid "OK"
+msgstr ""
+
+msgid "OVERDUE  ({task_count})"
+msgstr ""
+
+msgid "Offline cache is {minutes} minutes old."
+msgstr ""
+
+msgid "Offline mode — data cached {minutes}m ago."
+msgstr ""
+
+msgid "Offline mode — showing data cached {minutes}m ago."
+msgstr ""
+
+msgid "Only overdue tasks"
+msgstr ""
+
+msgid "Only tasks assigned to this team"
+msgstr ""
+
+msgid "Only tasks assigned to this team (user-group) by name or id (repeatable; OR semantics). Run 'cupt teams' to list available teams."
+msgstr ""
+
+msgid "Only tasks due this week"
+msgstr ""
+
+msgid "Only tasks due today"
+msgstr ""
+
+msgid "Only tasks with this tag"
+msgstr ""
+
+msgid "Only tasks with this tag (repeatable; tasks must have ALL tags given)"
+msgstr ""
+
+msgid "Opening browser for authentication..."
+msgstr ""
+
+msgid "Output raw status data as JSON, plus the resolved target."
+msgstr ""
+
+msgid "Output raw task data as JSON (always includes parent + comments)"
+msgstr ""
+
+msgid "Output raw task data as JSON (pipeable, no headers or background caching)"
+msgstr ""
+
+msgid "Output raw team data as JSON"
+msgstr ""
+
+msgid "Output summary data as JSON"
+msgstr ""
+
+msgid "Output the created task as JSON (id, url, full payload)."
+msgstr ""
+
+msgid "Override the filename stored on ClickUp"
+msgstr ""
+
+msgid "Override workspace ID"
+msgstr ""
+
+msgid "PARENT TASK"
+msgstr ""
+
+msgid "PARENT TASK: (Top Level Task)"
+msgstr ""
+
+msgid "Parent"
+msgstr ""
+
+msgid "Parent Description"
+msgstr ""
+
+msgid "Partial offline data (list cache, {minutes}m old). Run 'cupt prefetch' for full details and notes."
+msgstr ""
+
+msgid "Persistent cache cleared"
+msgstr ""
+
+msgid "Personal API Token"
+msgstr ""
+
+msgid "Personal API Token set"
+msgstr ""
+
+msgid "Personal API tokens should start with 'pk_'"
+msgstr ""
+
+msgid "Please manually visit the URL above"
+msgstr ""
+
+msgid "Please stop any other applications using this port"
+msgstr ""
+
+msgid "Port {port} is already in use"
+msgstr ""
+
+msgid "Pre-fetch task details and notes for offline use"
+msgstr ""
+
+msgid "Prefetching details for {count} tasks..."
+msgstr ""
+
+msgid "Print the work queue as JSON"
+msgstr ""
+
+msgid "Priority"
+msgstr ""
+
+msgid "Remove a tag from a task"
+msgstr ""
+
+msgid "Removed '{tag_name}' from {task_id}"
+msgstr ""
+
+msgid "Replaced active task {task_id} — {name}"
+msgstr ""
+
+msgid "Resolve and print the target status without modifying the task. Useful for agents to sanity-check before writing."
+msgstr ""
+
+msgid "Response: {response}"
+msgstr ""
+
+msgid "SIBLINGS (Subtasks of {parent_id})"
+msgstr ""
+
+msgid "SUBTASKS (of {task_id})"
+msgstr ""
+
+msgid "SUMMARY"
+msgstr ""
+
+msgid "Save path (default: original filename in current dir)"
+msgstr ""
+
+msgid "Set Personal API Token (starts with pk_)"
+msgstr ""
+
+msgid "Set default list ID"
+msgstr ""
+
+msgid "Set default workspace ID"
+msgstr ""
+
+msgid "Show a daily summary: due today, overdue, completed, and time tracked."
+msgstr "Mostrar um resumo diário: vencendo hoje, atrasadas, concluídas e tempo registrado."
+
+msgid "Show authentication status and user info"
+msgstr ""
+
+msgid "Show current configuration"
+msgstr ""
+
+msgid "Show current timer status"
+msgstr ""
+
+msgid "Show detailed task information. Falls back to the active task."
+msgstr ""
+
+msgid "Show extra info"
+msgstr ""
+
+msgid "Show only tasks assigned to you (default)"
+msgstr ""
+
+msgid "Show overdue tasks"
+msgstr "Mostrar tarefas atrasadas"
+
+msgid ""
+"Show status names available for a task's list.\n"
+"\n"
+"By default the argument is a task ID and the command resolves to the\n"
+"task's list. Use --list to pass a list ID directly. The status that\n"
+"`cupt done` would apply is marked with an arrow."
+msgstr ""
+
+msgid "Show task context (parent, siblings, subtasks). Falls back to active task."
+msgstr ""
+
+msgid "Show task notes"
+msgstr ""
+
+msgid "Show tasks due this week"
+msgstr ""
+
+msgid "Show tasks due today"
+msgstr "Mostrar tarefas com vencimento hoje"
+
+msgid "Show tasks for the whole workspace"
+msgstr ""
+
+msgid "Show the active task, if any."
+msgstr ""
+
+msgid "Show workspace-wide summary instead of just your tasks"
+msgstr ""
+
+msgid "Size"
+msgstr ""
+
+msgid "Skipped: {task_id}"
+msgstr ""
+
+msgid "Space"
+msgstr ""
+
+msgid "Start time tracking for a task. Falls back to the active task."
+msgstr ""
+
+msgid "Started"
+msgstr ""
+
+msgid "Started tracking time for task {task_id}"
+msgstr ""
+
+msgid "Status"
+msgstr "Status"
+
+msgid "Statuses"
+msgstr ""
+
+msgid "Stop current time tracking"
+msgstr ""
+
+msgid "Stopped: {task_id} — {name}"
+msgstr ""
+
+msgid "TIME TRACKED TODAY"
+msgstr ""
+
+msgid "Tag to apply (repeatable)."
+msgstr ""
+
+msgid "Tagged {task_id} with '{tag_name}'"
+msgstr ""
+
+msgid "Tags"
+msgstr ""
+
+msgid "Target list ID (defaults to active task's list, then user.default_list_id)"
+msgstr ""
+
+msgid "Task"
+msgstr "Tarefa"
+
+msgid "Task ID"
+msgstr ""
+
+msgid "Task created ({task_id}) but failed to add dependency on {blocks_id}: {error}"
+msgstr ""
+
+msgid "Task description"
+msgstr ""
+
+msgid "Task {index}/{total}: {name}"
+msgstr ""
+
+msgid "Task {task_id} marked as '{target_status}'!"
+msgstr ""
+
+msgid "Task {task_id} not found"
+msgstr ""
+
+msgid "Task {task_id} not found."
+msgstr ""
+
+msgid "Task {task_id} not in offline cache. Run 'cupt prefetch' or 'cupt show <id>' online first."
+msgstr ""
+
+msgid "Time tracking commands"
+msgstr ""
+
+msgid "Timer is already running. Stop current timer first."
+msgstr ""
+
+msgid "Timer stopped"
+msgstr ""
+
+msgid "To authenticate with ClickUp, you'll need to create an OAuth app:"
+msgstr ""
+
+msgid "To get your Personal API Token:"
+msgstr ""
+
+msgid "Token exchange response status: {status}"
+msgstr ""
+
+msgid "Tokens refreshed successfully"
+msgstr ""
+
+msgid "Total"
+msgstr ""
+
+msgid "Tracked"
+msgstr ""
+
+msgid "Treat the argument as a list ID instead of a task ID."
+msgstr ""
+
+msgid "Unassigned"
+msgstr ""
+
+msgid "Unknown"
+msgstr ""
+
+msgid "Unknown task"
+msgstr ""
+
+msgid "Upload a file as a task attachment"
+msgstr ""
+
+msgid "Usage: cupt note [<task_id>] <note_text>"
+msgstr ""
+
+msgid "Usage: cupt time add [<task_id>] <duration>"
+msgstr ""
+
+msgid "Use cached data (no network required)"
+msgstr ""
+
+msgid "Use locally cached task list (no network required)"
+msgstr ""
+
+msgid "Use workspace-wide tasks"
+msgstr ""
+
+msgid "User ID"
+msgstr ""
+
+msgid "WARN"
+msgstr ""
+
+msgid "Waiting for authentication on port {port}..."
+msgstr ""
+
+msgid "Work session ended."
+msgstr ""
+
+msgid "Work through matching tasks one at a time."
+msgstr "Trabalhar nas tarefas correspondentes uma de cada vez."
+
+msgid "Workspace"
+msgstr ""
+
+msgid "Workspace ID"
+msgstr ""
+
+msgid "Workspace ID not set. Run 'cupt config --workspace-id <id>' first."
+msgstr ""
+
+msgid "Workspace ID set to: {workspace_id}"
+msgstr ""
+
+msgid "Workspace: {workspace}"
+msgstr ""
+
+msgid "Would mark task {task_id} as '{target}' (list: {list_label}). No changes made."
+msgstr ""
+
+msgid "Yes"
+msgstr ""
+
+msgid "Your"
+msgstr ""
+
+msgid "[w]ork / [s]kip / [d]one / [q]uit"
+msgstr ""
+
+msgid "`--{label}` (without an ID) needs an active task. Use `cupt start <id>` or pass `--{label} <id>` explicitly."
+msgstr ""
+
+msgid "`cupt work` is interactive-only. Use `cupt work --json` for scripts."
+msgstr ""
+
+msgid "`cupt {command}` is interactive-only (set CUPT_INTERACTIVE=1 to force, or pass --interactive)."
+msgstr ""
+
+msgid "{prefix}{task_id}  {name}  · started {started_at}"
+msgstr ""
+
+msgid "✅ Timer is running"
+msgstr ""

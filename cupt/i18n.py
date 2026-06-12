@@ -8,6 +8,31 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 _TRANSLATION = gettext.NullTranslations()
+_LANGUAGE_ALIASES = {
+    "es": "es_LA",
+    "es-419": "es_LA",
+    "es_419": "es_LA",
+    "es-la": "es_LA",
+    "es_la": "es_LA",
+    "pt": "pt_BR",
+    "pt-br": "pt_BR",
+    "pt_br": "pt_BR",
+}
+_SUPPORTED_LOCALES = {
+    "de": "de",
+    "es_es": "es_ES",
+    "es_la": "es_LA",
+    "fr": "fr",
+    "it": "it",
+    "pt_br": "pt_BR",
+}
+_BASE_LANGUAGE_FALLBACKS = {
+    "de": "de",
+    "es": "es_LA",
+    "fr": "fr",
+    "it": "it",
+    "pt": "pt_BR",
+}
 
 
 class _PoTranslations(gettext.NullTranslations):
@@ -56,7 +81,17 @@ def configure_language(lang: Optional[str] = None) -> str:
     """Configure gettext for CLI strings and return the selected language code."""
     selected = lang or os.environ.get("CUPT_LANG")
     if not selected:
-        selected = (locale.getlocale()[0] or "en").split("_")[0]
+        selected = locale.getlocale()[0] or "en"
+
+    normalized = selected.replace("-", "_")
+    lookup = normalized.lower()
+    selected = _LANGUAGE_ALIASES.get(
+        lookup,
+        _SUPPORTED_LOCALES.get(
+            lookup,
+            _BASE_LANGUAGE_FALLBACKS.get(lookup.split("_")[0], normalized),
+        ),
+    )
 
     po_path = (
         Path(__file__).resolve().parent

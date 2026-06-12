@@ -152,17 +152,20 @@ later wouldn't be.
   the system locale. Document in README.
 - [x] **Generate `.pot` source catalog**, commit it to the repo.
 - [x] **AI-bootstrap one language end-to-end** as the proof point.
-  Spanish is the obvious pick (largest non-English audience overlap with
-  the terminal/developer crowd). Quality bar: the strings shouldn't
-  embarrass us, but native-speaker review can land after 1.0 — open a
-  GitHub issue inviting reviewers when we tag.
+  Latin American Spanish is the initial target (matching ClickUp's
+  `es_LA` locale). Quality bar: the strings shouldn't embarrass us, but
+  native-speaker review can land after 1.0 — open a GitHub issue
+  inviting reviewers when we tag.
+- [x] **Commit ClickUp-language catalog scaffolds** for `es_ES`, `fr`,
+  `de`, `it`, and `pt_BR` so translators can work against the same
+  `.pot` source while untranslated strings safely fall back to English.
 - [x] **CI check**: fail the build if `.po` files are stale relative to
   `.pot`. Stops new English strings from silently breaking
   translations.
 
 Out of scope for 1.0: RTL layout tweaks (table output is LTR anyway),
-translated README/AGENTS/CHANGELOG, more than one shipped language
-beyond English. All of those can come after 1.0 without breaking the
+translated README/AGENTS/CHANGELOG, and fully reviewed non-English
+translations. All of those can come after 1.0 without breaking the
 infrastructure contract.
 
 ### E. `--auto-note` — removed for v1.0
