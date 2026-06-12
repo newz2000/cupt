@@ -10,7 +10,9 @@ user impact are not listed.
 
 ## [Unreleased]
 
-(nothing yet)
+### Changed
+- Documented local real-workspace performance verification and corrected
+  `--all --team` timing guidance.
 
 ## [1.0.0] — 2026-06-11
 

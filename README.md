@@ -138,10 +138,10 @@ cupt list --team <team> --tag <tag> --mine  # stack filters freely
 
 `--mine` is on by default. Add `--all` (or omit `--mine`) to see the whole workspace.
 
-**A note on `--team` performance.** ClickUp's API has no server-side filter for teams, so `cupt` has to walk extra pages to find matches. On big workspaces this can take 5–20 seconds for `--all --team`. After the table you'll see a footer like `(team filter: searched N pages in T.Ts)` so the cost is honest. For the fastest, most reliable results on large workspaces, pair the team filter with a discriminating tag — the tag narrows server-side before the team filter runs:
+**A note on `--team` performance.** ClickUp's API has no server-side filter for teams, so `cupt` has to walk extra pages to find matches. On big workspaces this can take tens of seconds for `--all --team`; local v1.0 verification against one real workspace measured about 31–37 seconds when the command hit the 10-page cap. After the table you'll see a footer like `(team filter: searched N pages in T.Ts)` so the cost is honest. For the fastest, most reliable results on large workspaces, pair the team filter with a discriminating tag — the tag narrows server-side before the team filter runs:
 
 ```bash
-cupt list --team MattTech --tag ai_ready    # near-instant, server narrows first
+cupt list --team MattTech --tag ai_ready    # faster: server narrows first
 ```
 
 If you see `hit page cap — pair with --tag for full coverage` in the footer, that's a hint that matches may exist on pages we didn't walk.

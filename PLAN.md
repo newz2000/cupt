@@ -202,15 +202,18 @@ fresh feature with a real input, not a tweak to this one. Park it.
 ### F. Performance — only what shows up in real use
 
 - [x] **Profile `TaskService.list_tasks`** once with `cProfile` against
-  a realistic workspace. Don't pre-optimize.
+  a realistic workspace. Verified locally on 2026-06-11; see
+  `docs/performance.md`. Don't pre-optimize.
 - [x] **Lazy loading** for optional fields (subtasks) on `show` /
   `context` paths.
-- [x] **Team → task mapping cache** *(deferred; telemetry does not warrant implementation yet)* —
-  the 0.7.1 page-walk adds 5-15s on `--all --team` against large
-  workspaces. Pre-walk once per session with TTL, persist
+- [x] **Team → task mapping cache** *(deferred; needs a dedicated design)* —
+  local v1.0 verification found that `--all --team` can take about
+  31-37s when the 10-page cap is hit, while pairing `--team` with a
+  selective `--tag` stayed near 2-3s. A cache could pre-walk once per
+  session with TTL and persist
   `{team_id: [task_id, …]}` in `~/.cupt/teams_cache.json`,
-  `cupt teams --refresh` to invalidate. Don't build until the
-  page-walk latency is actually painful in practice.
+  `cupt teams --refresh` to invalidate. Do not build it in the
+  verification patch; treat it as post-v1.0 performance work.
 
 ---
 
