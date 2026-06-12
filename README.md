@@ -183,7 +183,19 @@ cupt list --offline               # later, on the plane
 cupt show <task-id> --offline
 ```
 
-### 9. Pipe everything
+### 9. Focus with `cupt work`
+
+When you want to work down a queue without re-running `cupt list`, use sequential focus mode:
+
+```bash
+cupt work --tag ai_ready
+cupt work --today
+cupt work --team MattTech --json   # inspect the queue without prompting
+```
+
+Interactive mode presents one task at a time and accepts `[w]ork`, `[s]kip`, `[d]one`, or `[q]uit`. Selecting work sets the active task and starts a timer when possible; selecting done resolves the task's completion status per list.
+
+### 10. Pipe everything
 
 Every read command supports `--json`:
 
@@ -191,6 +203,8 @@ Every read command supports `--json`:
 cupt list --tag ai_ready --json | jq '.[] | .name'
 cupt statuses <task-id> --json    # agent-friendly: target + all statuses
 ```
+
+Shell completion snippets for bash, zsh, and fish live in `docs/shell-completion.md`. Agent JSON and exit-code contracts live in `docs/agent-contract.md`.
 
 You now know enough to be productive. The command reference below is a quicker reminder once these basics are in muscle memory.
 
@@ -205,15 +219,17 @@ You now know enough to be productive. The command reference below is a quicker r
 | `cupt show [<id>] [--notes] [--json] [--offline]` | Full task details. Falls back to the active task when no ID is given. |
 | `cupt context [<id>]` | Parent + sibling/subtask view. Falls back to active. |
 | `cupt statuses <id> [--list] [--json]` | Show available statuses for a task's list (or pass `--list <list-id>`) |
-| `cupt done [<id>] [--note "…"] [--auto-note] [--dry-run]` | Mark complete; clears the active pointer on success. `--dry-run` previews; `--auto-note` uses a local AI to draft a note |
+| `cupt done [<id>] [--note "…"] [--dry-run]` | Mark complete; clears the active pointer on success. `--dry-run` previews the resolved status. |
 | `cupt add "<name>" [--list X] [--parent <id\|this>] [--blocks <id\|this>] [-d "…"] [--due …] [--tag X] [--json]` | Create a new task. Defaults: active task's list, you as assignee, no link. |
 | `cupt start <id>` / `cupt stop` / `cupt active` | Set / clear / show the session's active task (interactive only). |
+| `cupt work [--tag X] [--team X] [--today\|--overdue\|--week] [--json]` | Sequential focus mode: work, skip, complete, or quit one task at a time. |
+| `cupt summary [--all] [--json]` | Daily due/overdue/completed/time summary. |
 | `cupt tag add\|remove <id> <name>` | Tag management |
 | `cupt time start [<id>]` / `cupt time stop` / `cupt time add [<id>] <dur>` / `cupt time status` | Time tracking. `start` and `add` fall back to the active task. |
 | `cupt note [<id>] "<text>"` / `cupt notes [<id>]` | Add or list comments; both fall back to the active task. |
 | `cupt attach list\|add\|get <id> [args]` | Attachment management |
 | `cupt prefetch` | Cache details for the current task set for offline use |
-| Global: `--interactive` / `--no-interactive`, `CUPT_INTERACTIVE=1\|0` | Force interactive (short IDs + active task) or stateless mode. Default: enabled when stdout is a TTY. |
+| Global: `--interactive` / `--no-interactive`, `--lang`, `CUPT_INTERACTIVE=1\|0`, `CUPT_LANG` | Force interactive (short IDs + active task) or stateless mode. Default: enabled when stdout is a TTY. |
 
 ## Use as a Python library
 
@@ -304,21 +320,16 @@ If you're reading ClickUp's API docs and see `team_id`, that's the workspace ID.
 
 `cupt` is built with a focus on stability and testability.
 
-- **Coverage**: 85%
-- **Tests**: 292 unit tests using `pytest` and mocks, ~0.4s wall time.
+- **Coverage**: CI enforces at least 80%.
+- **Tests**: unit tests use `pytest` and mocks.
 
 ```bash
 pytest --cov=cupt tests/
 ```
 
 ## Future Roadmap
-Planned features for upcoming releases:
-- **`cupt work` / `cupt gtd`**: Sequential "focused work" mode to tackle a list of tasks one by one.
-- **Shell Completion**: Tab-completion for task IDs (drawing from the local short-ID table) and commands.
-- **Local AI integration**: Optional Ollama/Apple Intelligence/Windows Copilot backends for natural-language summaries and note suggestions.
-- **Policy ingestion**: Pull guidance documents from ClickUp lists/folders so agents follow the right rules per area.
 
-See `PLAN.md` for the full roadmap.
+Post-1.0 experiments are tracked in `PLAN.md`, including saved views, policy ingestion, and optional AI plugin ideas.
 
 ## Project Structure
 - `cupt/` — package root

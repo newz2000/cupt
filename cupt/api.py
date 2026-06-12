@@ -162,9 +162,7 @@ class ClickUpClient:
         """POST /list/{list_id}/task — create a task in the given list."""
         return self._make_request("POST", f"/list/{list_id}/task", data=data)
 
-    def add_task_dependency(
-        self, task_id: str, depends_on: str
-    ) -> Dict[str, Any]:
+    def add_task_dependency(self, task_id: str, depends_on: str) -> Dict[str, Any]:
         """Make ``task_id`` blocked by ``depends_on`` (i.e. ``depends_on`` must
         complete before ``task_id`` can)."""
         return self._make_request(

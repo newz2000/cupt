@@ -2,6 +2,9 @@
 
 from unittest.mock import patch
 
+import click
+import pytest
+
 from cupt.context import get_client_context
 
 
@@ -22,23 +25,23 @@ def test_returns_context_when_authenticated():
         assert workspace_id == "ws1"
 
 
-def test_returns_none_when_not_authenticated():
+def test_exits_when_not_authenticated():
     with patch("cupt.context.ConfigManager") as mock_cm:
         mock_cm.return_value.is_authenticated.return_value = False
-        config, client, workspace_id = get_client_context()
-        assert client is None
-        assert config is None
-        assert workspace_id is None
+        with pytest.raises(click.exceptions.Exit) as exc:
+            get_client_context()
+        assert exc.value.exit_code == 2
 
 
-def test_returns_none_when_workspace_id_missing():
+def test_exits_when_workspace_id_missing():
     with patch("cupt.context.ConfigManager") as mock_cm, patch(
         "cupt.context.ClickUpClient"
     ):
         mock_cm.return_value.is_authenticated.return_value = True
         mock_cm.return_value.get.return_value = None
-        config, client, workspace_id = get_client_context(need_workspace=True)
-        assert client is None
+        with pytest.raises(click.exceptions.Exit) as exc:
+            get_client_context(need_workspace=True)
+        assert exc.value.exit_code == 2
 
 
 def test_skips_workspace_check_when_not_required():

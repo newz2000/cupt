@@ -6,7 +6,6 @@ import pytest
 
 from cupt.state import StateManager
 
-
 # ---------------------------------------------------------------------------
 # active task
 # ---------------------------------------------------------------------------
@@ -124,9 +123,7 @@ def test_free_short_for_removes_entry(tmp_path):
     assert freed == "1"
     assert sm.lookup_short(1) is None
     # Subsequent reconciliation reclaims the freed slot.
-    mapping = sm.reconcile(
-        [_task("868b"), _task("868c")], full_sync=True
-    )
+    mapping = sm.reconcile([_task("868b"), _task("868c")], full_sync=True)
     assert mapping["868c"] == "1"
 
 

@@ -145,6 +145,12 @@ Attachment downloads (`cupt attach get`) hit pre-signed S3 URLs from
 ClickUp. Sending `Authorization` invalidates the signature. The
 download path uses a plain `requests.get` with no auth header.
 
+### Agent contract docs
+The v1.0 scripting contract lives in `docs/agent-contract.md`. Update it in the
+same PR as any change to a read command's `--json` shape, documented exit code,
+or non-interactive behavior. The bundled agent skill in `skill/cupt-clickup/`
+must stay in sync with command changes.
+
 ### Output discipline: stdout is data, stderr is decoration
 Anything you print with `print_error / print_warning / print_success`
 goes to **stderr**. This is what makes `cupt list --json | jq …`

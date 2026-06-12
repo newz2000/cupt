@@ -48,8 +48,7 @@ def resolve_task_id(
         active = state.get_active()
         if not active:
             raise IDResolutionError(
-                "No task ID and no active task. "
-                "Use `cupt start <id>` or pass an ID."
+                "No task ID and no active task. Use `cupt start <id>` or pass an ID."
             )
         return active["clickup_id"]
 

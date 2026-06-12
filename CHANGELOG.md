@@ -12,6 +12,21 @@ user impact are not listed.
 
 (nothing yet)
 
+## [1.0.0] — 2026-06-11
+
+### Added
+- `cupt work` sequential focus mode for walking a filtered queue with work, skip, done, and quit actions.
+- `cupt summary --json` for agent-readable daily summary data.
+- v1.0 agent contract and deprecation policy docs.
+- GitHub Actions CI for Ruff, tests with coverage, non-interactive contract checks, translation catalog checks, and package builds.
+- gettext/Babel-compatible i18n scaffold with `--lang`, `CUPT_LANG`, a source catalog, and a Spanish proof-of-concept catalog.
+
+### Changed
+- Development tooling now exposes a `dev` extra for CI/test dependencies.
+
+### Removed
+- Removed `cupt done --auto-note` and the local Apple Intelligence helper so v1.0 does not freeze an unsupported AI-note contract.
+
 ## [0.8.0] — 2026-06-09
 
 ### Added
@@ -273,10 +288,6 @@ The big async + offline release.
   detail cache; `cupt list` transparently seeds it after display
   (≤2s budget, 8 worker threads); `cupt show --offline` reads from
   cache and falls back to the list cache with a partial-data warning.
-- **Local-AI completion notes.** `cupt done --auto-note` calls a
-  local AI provider (Apple Intelligence on macOS 26+) for a
-  suggested completion note. Gracefully no-ops on machines without
-  the SDK.
 - **`cupt summary` command** with concurrent data fetching.
 - **Custom exception hierarchy:** `CuptError`, `APIError`,
   `AuthError`, `ConfigError` in `cupt/exceptions.py`.

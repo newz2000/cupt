@@ -74,9 +74,7 @@ def stop_cmd():
     state = StateManager()
     previous = state.clear_active()
     if previous:
-        print_success(
-            f"Stopped: {previous['clickup_id']} — {previous.get('name', '')}"
-        )
+        print_success(f"Stopped: {previous['clickup_id']} — {previous.get('name', '')}")
     else:
         print_warning("No active task.")
 

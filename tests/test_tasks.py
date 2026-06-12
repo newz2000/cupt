@@ -712,20 +712,6 @@ def test_complete_task_dry_run_does_not_mutate(runner, mock_config, mock_client)
         mock_client.add_task_comment.assert_not_called()
 
 
-def test_complete_task_dry_run_skips_auto_note(runner, mock_config, mock_client):
-    """--dry-run must not trigger the AI note flow even if --auto-note is set."""
-    with patch(
-        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
-    ), patch("cupt.tasks._get_auto_note") as auto:
-        mock_client.get_task.return_value = {"id": "t1", "list": {"id": "l1"}}
-        mock_client.get_list_statuses.return_value = [
-            {"status": "Done", "type": "closed"}
-        ]
-        result = runner.invoke(complete_task_cmd, ["t1", "--dry-run", "--auto-note"])
-        assert result.exit_code == 0
-        auto.assert_not_called()
-
-
 def test_complete_task_fallback_to_space_statuses(runner, mock_config, mock_client):
     with patch(
         "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
@@ -764,78 +750,6 @@ def test_complete_task_exception(runner, mock_config, mock_client):
         mock_client.get_task.side_effect = Exception("API Error")
         result = runner.invoke(complete_task_cmd, ["t1"])
         assert "Failed to complete task" in result.output
-
-
-def test_complete_task_auto_note_no_ai(runner, mock_config, mock_client):
-    """--auto-note shows a graceful warning when no local AI is available."""
-    with patch(
-        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
-    ):
-        mock_client.get_task.return_value = {
-            "id": "t1",
-            "name": "Write report",
-            "list": {"id": "l1"},
-        }
-        mock_client.get_task_comments.return_value = []
-        mock_client.get_list_statuses.return_value = [
-            {"status": "Done", "type": "closed"}
-        ]
-        with patch("cupt.ai.get_ai_suggestion", return_value=None):
-            result = runner.invoke(complete_task_cmd, ["t1", "--auto-note"])
-            assert result.exit_code == 0
-            assert "No local AI available" in result.output
-            assert "Done" in result.output  # task still completes
-
-
-def test_complete_task_auto_note_accepted(runner, mock_config, mock_client):
-    """--auto-note completes the task with the AI suggestion when accepted."""
-    with patch(
-        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
-    ):
-        mock_client.get_task.return_value = {
-            "id": "t1",
-            "name": "Write report",
-            "list": {"id": "l1"},
-        }
-        mock_client.get_task_comments.return_value = []
-        mock_client.get_list_statuses.return_value = [
-            {"status": "Done", "type": "closed"}
-        ]
-        with patch("cupt.ai.get_ai_suggestion", return_value="Completed the report."):
-            result = runner.invoke(
-                complete_task_cmd, ["t1", "--auto-note"], input="a\n"
-            )
-            assert result.exit_code == 0
-            mock_client.add_task_comment.assert_called_once_with(
-                "t1", "Completed the report."
-            )
-
-
-def test_complete_task_auto_note_skipped(runner, mock_config, mock_client):
-    """--auto-note skips the note when the user enters 's'."""
-    with patch(
-        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
-    ):
-        mock_client.get_task.return_value = {
-            "id": "t1",
-            "name": "Write report",
-            "list": {"id": "l1"},
-        }
-        mock_client.get_task_comments.return_value = []
-        mock_client.get_list_statuses.return_value = [
-            {"status": "Done", "type": "closed"}
-        ]
-        with patch("cupt.ai.get_ai_suggestion", return_value="Completed the report."):
-            result = runner.invoke(
-                complete_task_cmd, ["t1", "--auto-note"], input="s\n"
-            )
-            assert result.exit_code == 0
-            mock_client.add_task_comment.assert_not_called()
-
-
-# ---------------------------------------------------------------------------
-# context
-# ---------------------------------------------------------------------------
 
 
 def test_context_cmd_cli(runner, mock_config, mock_client):
@@ -916,7 +830,8 @@ def test_show_task_saves_detail_cache(runner, mock_config, mock_client):
         saved_id, saved_data = mock_config.save_task_detail.call_args[0]
         assert saved_id == "t1"
         assert saved_data["task"]["name"] == "Task 1"
-        assert len(saved_data["comments"]) == 1
+        assert saved_data["comments"] == []
+        mock_client.get_task_comments.assert_not_called()
 
 
 def test_show_task_displays_tags(runner, mock_config, mock_client):

@@ -88,9 +88,7 @@ def _render_task_list(
             f"{'Est':<8} {'Tracked':<8} {'Name'}"
         )
     else:
-        click.echo(
-            f"\n{short_header}{'ID':<12} {'Status':<12} {'Due':<18} {'Name'}"
-        )
+        click.echo(f"\n{short_header}{'ID':<12} {'Status':<12} {'Due':<18} {'Name'}")
     click.echo("-" * _separator_width(verbose))
 
     for task in tasks:
@@ -132,9 +130,7 @@ def _render_task_list(
                 f"{assignee:<18} {est:<8} {tracked:<8} {name}"
             )
         else:
-            click.echo(
-                f"{short_cell}{task_id:<12} {status:<12} {due_date:<18} {name}"
-            )
+            click.echo(f"{short_cell}{task_id:<12} {status:<12} {due_date:<18} {name}")
 
 
 def _print_active_footer(state: StateManager) -> None:
@@ -581,10 +577,14 @@ def show_task(
 
         with ThreadPoolExecutor(max_workers=2) as executor:
             fut_parent = executor.submit(_fetch_parent)
-            fut_notes = executor.submit(client.get_task_comments, task_id)
+            fut_notes = (
+                executor.submit(client.get_task_comments, task_id)
+                if include_notes or as_json
+                else None
+            )
 
         parent_task = fut_parent.result()
-        comments = fut_notes.result()
+        comments = fut_notes.result() if fut_notes is not None else []
 
         # Always save to detail cache so --offline works next time.
         config.save_task_detail(
@@ -833,11 +833,6 @@ def _prefetch_details(client, config, tasks) -> int:
 @click.argument("task_id", required=False)
 @click.option("--note", help="Add a completion note")
 @click.option(
-    "--auto-note",
-    is_flag=True,
-    help="Use local AI (Apple Intelligence) to suggest a completion note",
-)
-@click.option(
     "--dry-run",
     is_flag=True,
     help=(
@@ -845,20 +840,19 @@ def _prefetch_details(client, config, tasks) -> int:
         "Useful for agents to sanity-check before writing."
     ),
 )
-def complete_task_cmd(task_id, note, auto_note, dry_run):
+def complete_task_cmd(task_id, note, dry_run):
     """Mark a task as complete. Falls back to the active task."""
     try:
         task_id = resolve_task_id(task_id)
     except IDResolutionError as e:
         print_error(str(e))
         return
-    return complete_task(task_id, note, auto_note, dry_run)
+    return complete_task(task_id, note, dry_run)
 
 
 def complete_task(
     task_id: str,
     note: Optional[str] = None,
-    auto_note: bool = False,
     dry_run: bool = False,
 ):
     """Mark a task complete via TaskService."""
@@ -877,9 +871,6 @@ def complete_task(
                 f"(list: {list_label}). No changes made."
             )
             return
-
-        if auto_note and not note:
-            note = _get_auto_note(client, task_id)
 
         target_status = service.complete_task(task_id, note)
         print_success(f"Task {task_id} marked as '{target_status}'!")
@@ -996,53 +987,6 @@ def show_statuses(identifier: str, is_list: bool = False, as_json: bool = False)
         print_error(f"Failed to fetch statuses: {e}")
 
 
-# ---------------------------------------------------------------------------
-# auto-note (used by cupt done --auto-note)
-# ---------------------------------------------------------------------------
-
-
-def _get_auto_note(client, task_id: str) -> Optional[str]:
-    """Fetch task context, call local AI for a note suggestion, prompt accept/edit/skip."""
-    from cupt.ai import get_ai_suggestion
-
-    try:
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            fut_task = executor.submit(client.get_task, task_id)
-            fut_comments = executor.submit(client.get_task_comments, task_id)
-        task = fut_task.result()
-        comments = fut_comments.result()
-    except Exception:
-        task, comments = {}, []
-
-    parts = [f"Task: {task.get('name', task_id)}"]
-    if task.get("description"):
-        parts.append(f"Description: {task['description'][:400]}")
-    recent = [c.get("text", "") for c in comments[-3:] if c.get("text")]
-    if recent:
-        parts.append("Recent notes: " + "; ".join(recent))
-
-    prompt = (
-        "Write a brief, professional one-sentence completion note for this task "
-        "(just the note, no preamble):\n\n" + "\n".join(parts)
-    )
-
-    suggestion = get_ai_suggestion(prompt)
-
-    if not suggestion:
-        print_warning("No local AI available. Use --note to add a note manually.")
-        return None
-
-    click.echo(f"\nSuggested note: {suggestion}")
-    choice = click.prompt("[a]ccept / [e]dit / [s]kip", default="a")
-
-    if choice.lower().startswith("e"):
-        return click.prompt("Note", default=suggestion)
-    if choice.lower().startswith("s"):
-        return None
-    return suggestion
-
-
-# ---------------------------------------------------------------------------
 # context
 # ---------------------------------------------------------------------------
 

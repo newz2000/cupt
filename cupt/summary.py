@@ -1,3 +1,4 @@
+import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
@@ -27,16 +28,17 @@ _SUMMARY_FIXED_WIDTH_WITH_DATE = 49
     is_flag=True,
     help="Show workspace-wide summary instead of just your tasks",
 )
-def summary_cmd(show_all):
-    """Show a daily summary: due today, overdue, completed, and time tracked"""
-    return show_summary(mine=not show_all)
+@click.option("--json", "as_json", is_flag=True, help="Output summary data as JSON")
+def summary_cmd(show_all: bool, as_json: bool) -> None:
+    """Show a daily summary: due today, overdue, completed, and time tracked."""
+    show_summary(mine=not show_all, as_json=as_json)
 
 
-def show_summary(mine: bool = True):
+def show_summary(mine: bool = True, as_json: bool = False) -> Optional[Dict[str, Any]]:
     """Fetch and display a daily task and time summary."""
     config, client, workspace_id = get_client_context()
     if not client:
-        return
+        return None
 
     user_id = config.get("user.user_id") if mine else None
 
@@ -46,7 +48,6 @@ def show_summary(mine: bool = True):
 
     task_service = TaskService(client)
 
-    # All fetches are independent — run concurrently.
     def _fetch_due_today():
         return task_service.list_tasks(
             workspace_id, user_id=user_id, today=True, mine=mine
@@ -90,29 +91,51 @@ def show_summary(mine: bool = True):
             fut_entries = executor.submit(_fetch_time_entries)
             fut_timer = executor.submit(_fetch_running_timer)
 
-        due_today = fut_due.result()
-        overdue = fut_overdue.result()
-        completed_today = fut_completed.result()
-        time_entries = fut_entries.result()
-        running_timer = fut_timer.result()
+            due_today = fut_due.result()
+            overdue = fut_overdue.result()
+            completed_today = fut_completed.result()
+            time_entries = fut_entries.result()
+            running_timer = fut_timer.result()
 
     except Exception as e:
         print_error(f"Failed to fetch summary data: {e}")
-        return
+        return None
 
-    # ------------------------------------------------------------------ #
-    # Render                                                               #
-    # ------------------------------------------------------------------ #
+    total_ms = sum(int(e.get("duration", 0)) for e in time_entries)
+    payload: Dict[str, Any] = {
+        "scope": "mine" if mine else "all",
+        "date": today.date().isoformat(),
+        "time_tracked_ms": total_ms,
+        "running_timer": running_timer,
+        "due_today": due_today,
+        "overdue": overdue,
+        "completed_today": completed_today,
+        "time_entries": time_entries,
+    }
 
+    if as_json:
+        click.echo(json.dumps(payload, indent=2))
+        return payload
+
+    _render_summary(payload)
+    return payload
+
+
+def _render_summary(payload: Dict[str, Any]) -> None:
+    """Render summary data for humans."""
     day_label = datetime.now().strftime("%A, %B %-d, %Y")
-    scope = "Your" if mine else "Workspace"
+    scope = "Your" if payload["scope"] == "mine" else "Workspace"
     click.echo(f"\n{scope.upper()} SUMMARY  —  {day_label}")
     click.echo("=" * 60)
 
-    # Time tracked
+    running_timer = payload["running_timer"]
+    due_today = payload["due_today"]
+    overdue = payload["overdue"]
+    completed_today = payload["completed_today"]
+
     click.echo("\nTIME TRACKED TODAY")
     click.echo("-" * 20)
-    total_ms = sum(int(e.get("duration", 0)) for e in time_entries)
+    total_ms = payload["time_tracked_ms"]
     click.echo(f"  Total:   {format_duration(total_ms) if total_ms else '0m'}")
     if running_timer:
         start_ms = int(running_timer.get("start", 0))
@@ -129,7 +152,6 @@ def show_summary(mine: bool = True):
     else:
         click.echo("  Running: none")
 
-    # Due today
     click.echo(
         f"\nDUE TODAY  ({len(due_today)} task{'s' if len(due_today) != 1 else ''})"
     )
@@ -140,7 +162,6 @@ def show_summary(mine: bool = True):
         for t in due_today:
             _print_task_line(t)
 
-    # Overdue
     click.echo(f"\nOVERDUE  ({len(overdue)} task{'s' if len(overdue) != 1 else ''})")
     click.echo("-" * 20)
     if not overdue:
@@ -149,7 +170,6 @@ def show_summary(mine: bool = True):
         for t in overdue:
             _print_task_line(t, show_date=True)
 
-    # Completed today
     click.echo(
         f"\nCOMPLETED TODAY  ({len(completed_today)} task{'s' if len(completed_today) != 1 else ''})"
     )
