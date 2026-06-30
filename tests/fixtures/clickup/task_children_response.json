@@ -1,0 +1,14 @@
+{
+  "tasks": [
+    {
+      "id": "subtask_fixture_1",
+      "name": "Sample Subtask",
+      "status": {
+        "status": "open",
+        "type": "open"
+      },
+      "parent": "task_fixture_1",
+      "due_date": null
+    }
+  ]
+}

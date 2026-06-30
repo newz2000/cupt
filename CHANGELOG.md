@@ -10,12 +10,21 @@ user impact are not listed.
 
 ## [Unreleased]
 
+### Added
+- Added sanitized ClickUp payload fixture tests and an opt-in live ClickUp E2E
+  test for comment rendering, status resolution, and read command contracts.
+
 ### Changed
 - Documented local real-workspace performance verification and corrected
   `--all --team` timing guidance.
-- Marked the package as `1.0.0b1` for beta release preparation.
+- Marked the package as `1.0.0b2` for the second v1.0 beta.
 - Expanded the Spanish beta localization proof of concept with translated CLI
   command help, common human-facing messages, and catalog drift checks.
+
+### Fixed
+- Fixed `cupt context`, `cupt notes`, and `cupt show --notes` rendering blank
+  comments for ClickUp API payloads that carry note bodies in `comment_text`
+  or rich `comment` segments.
 
 ## [1.0.0] — 2026-06-11
 

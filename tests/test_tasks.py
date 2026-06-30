@@ -794,6 +794,24 @@ def test_context_cmd_top_level(runner, mock_config, mock_client):
         assert "A note" in result.output
 
 
+def test_context_cmd_displays_clickup_comment_text(runner, mock_config, mock_client):
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_task.return_value = {
+            "id": "t1",
+            "name": "Top Task",
+            "status": {"status": "open"},
+        }
+        mock_client.get_task_comments.return_value = [
+            {"user": {"username": "bob"}, "comment_text": "Real ClickUp note"}
+        ]
+        mock_client.get_task_children.return_value = []
+        result = runner.invoke(context_cmd, ["t1"])
+        assert result.exit_code == 0
+        assert "[bob]: Real ClickUp note" in result.output
+
+
 def test_context_cmd_exception(runner, mock_config, mock_client):
     with patch(
         "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
@@ -906,6 +924,29 @@ def test_show_task_json_output(runner, mock_config, mock_client):
         assert payload["task"]["id"] == "t1"
         assert payload["parent"] is None
         assert payload["comments"][0]["text"] == "a note"
+
+
+def test_show_task_notes_displays_clickup_comment_text(
+    runner, mock_config, mock_client
+):
+    """show --notes renders ClickUp's raw comment_text field."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_task.return_value = {
+            "id": "t1",
+            "name": "Task 1",
+            "status": {"status": "open"},
+            "space": {"id": "s1"},
+            "folder": {"name": "f1"},
+            "list": {"name": "l1"},
+        }
+        mock_client.get_task_comments.return_value = [
+            {"user": {"username": "alice"}, "comment_text": "Real ClickUp note"}
+        ]
+        result = runner.invoke(show_task_cmd, ["t1", "--notes"])
+        assert result.exit_code == 0
+        assert "[No date] alice: Real ClickUp note" in result.output
 
 
 def test_show_task_offline_from_detail_cache(runner, mock_config, mock_client):

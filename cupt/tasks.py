@@ -11,6 +11,8 @@ from cupt.resolver import IDResolutionError, resolve_task_id
 from cupt.services.task_service import TaskService
 from cupt.state import StateManager
 from cupt.utils import (
+    format_comment_author,
+    format_comment_text,
     format_date,
     format_duration,
     get_terminal_width,
@@ -701,8 +703,8 @@ def _display_task(task, parent_task, comments, include_notes: bool):
         if not comments:
             click.echo(_("No notes found."))
         for msg in comments:
-            author = msg.get("user", {}).get("username", "Unknown")
-            text = msg.get("text", "")
+            author = format_comment_author(msg)
+            text = format_comment_text(msg)
             date = format_date(msg.get("date"))
             click.echo(f"[{date}] {author}: {text}")
 
@@ -1108,8 +1110,8 @@ def show_context(task_id: str, show_completed: bool = False):
         if not ctx["notes"]:
             click.echo(_("No notes found."))
         for msg in ctx["notes"]:
-            author = msg.get("user", {}).get("username", "Unknown")
-            text = msg.get("text", "")
+            author = format_comment_author(msg)
+            text = format_comment_text(msg)
             click.echo(f"[{author}]: {text}")
 
         if ctx["is_subtask"] and ctx["parent_task"]:

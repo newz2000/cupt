@@ -4,7 +4,14 @@ from cupt.context import get_client_context
 from cupt.i18n import _, format_message
 from cupt.resolver import IDResolutionError, resolve_task_id
 from cupt.services.note_service import NoteService
-from cupt.utils import format_date, print_error, print_success, print_warning
+from cupt.utils import (
+    format_comment_author,
+    format_comment_text,
+    format_date,
+    print_error,
+    print_success,
+    print_warning,
+)
 
 
 @click.command(name="note")
@@ -70,8 +77,8 @@ def list_notes(task_id):
         click.echo("=" * 80)
 
         for msg in comments:
-            author = msg.get("user", {}).get("username", _("Unknown"))
-            text = msg.get("text", "")
+            author = format_comment_author(msg, _("Unknown"))
+            text = format_comment_text(msg)
             date = format_date(msg.get("date"))
             click.echo(f"[{date}] {author}:")
             for line in text.split("\n"):

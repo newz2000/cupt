@@ -1,0 +1,97 @@
+{
+  "id": "task_fixture_1",
+  "custom_id": null,
+  "custom_item_id": 0,
+  "name": "Sample Task With Sanitized Data",
+  "text_content": "",
+  "description": "Sanitized task description used for renderer contract tests.",
+  "status": {
+    "id": "status_open_fixture",
+    "status": "open",
+    "color": "#87909e",
+    "orderindex": 1,
+    "type": "open"
+  },
+  "orderindex": "1000.00000000000000000000000000000000",
+  "date_created": "1760000000000",
+  "date_updated": "1760000100000",
+  "date_closed": null,
+  "date_done": null,
+  "archived": false,
+  "creator": {
+    "id": 1001,
+    "username": "Example User",
+    "color": "#123456",
+    "email": null,
+    "profilePicture": null
+  },
+  "assignees": [
+    {
+      "id": 1001,
+      "username": "Example User",
+      "color": "#123456",
+      "initials": "EU",
+      "email": null,
+      "profilePicture": null
+    }
+  ],
+  "group_assignees": [
+    {
+      "id": "group_fixture_1",
+      "name": "Example Team"
+    }
+  ],
+  "watchers": [],
+  "checklists": [],
+  "tags": [
+    {
+      "name": "sample-tag",
+      "tag_fg": "#36B057",
+      "tag_bg": "#36B057",
+      "creator": 1001
+    }
+  ],
+  "parent": null,
+  "top_level_parent": null,
+  "priority": null,
+  "due_date": null,
+  "start_date": null,
+  "points": null,
+  "time_estimate": null,
+  "time_spent": 0,
+  "custom_fields": [],
+  "dependencies": [],
+  "linked_tasks": [],
+  "locations": [],
+  "team_id": "workspace_fixture_1",
+  "url": null,
+  "sharing": {
+    "public": false,
+    "public_share_expires_on": null,
+    "public_fields": [],
+    "token": null,
+    "seo_optimized": false
+  },
+  "permission_level": "create",
+  "list": {
+    "id": "list_fixture_1",
+    "name": "Sample List",
+    "access": true
+  },
+  "project": {
+    "id": "folder_fixture_1",
+    "name": "Sample Folder",
+    "hidden": false,
+    "access": true
+  },
+  "folder": {
+    "id": "folder_fixture_1",
+    "name": "Sample Folder",
+    "hidden": false,
+    "access": true
+  },
+  "space": {
+    "id": "space_fixture_1"
+  },
+  "attachments": []
+}

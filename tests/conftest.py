@@ -15,10 +15,14 @@ Pattern for auth-error tests (testing the guard itself):
         ...
 """
 
+import json
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 from click.testing import CliRunner
+
+_FIXTURE_DIR = Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture
@@ -42,3 +46,13 @@ def mock_config():
 @pytest.fixture
 def mock_client():
     return MagicMock()
+
+
+@pytest.fixture
+def fixture_json():
+    def _load(relative_path: str):
+        path = _FIXTURE_DIR / relative_path
+        with open(path, "r") as f:
+            return json.load(f)
+
+    return _load

@@ -1,0 +1,71 @@
+{
+  "comments": [
+    {
+      "id": "comment_fixture_1",
+      "comment": [
+        {
+          "text": "First sanitized comment line",
+          "attributes": {}
+        },
+        {
+          "text": "\n",
+          "attributes": {
+            "block-id": "block-fixture-1"
+          }
+        },
+        {
+          "text": "Second sanitized comment line",
+          "attributes": {}
+        }
+      ],
+      "comment_text": "First sanitized comment line\nSecond sanitized comment line",
+      "user": {
+        "id": 1001,
+        "username": "Example User",
+        "email": null,
+        "color": "#123456",
+        "initials": "EU",
+        "profilePicture": null
+      },
+      "assignee": null,
+      "group_assignee": null,
+      "reactions": [],
+      "date": "1760000200000",
+      "reply_count": 0
+    },
+    {
+      "id": "comment_fixture_2",
+      "comment": [
+        {
+          "text": "Rich text fallback comment",
+          "attributes": {
+            "bold": true
+          }
+        },
+        {
+          "text": "\n",
+          "attributes": {
+            "block-id": "block-fixture-2"
+          }
+        },
+        {
+          "text": "Rendered from rich segments",
+          "attributes": {}
+        }
+      ],
+      "user": {
+        "id": 1002,
+        "username": "Example Reviewer",
+        "email": null,
+        "color": "#654321",
+        "initials": "ER",
+        "profilePicture": null
+      },
+      "assignee": null,
+      "group_assignee": null,
+      "reactions": [],
+      "date": "1760000300000",
+      "reply_count": 0
+    }
+  ]
+}

@@ -10,7 +10,7 @@ import re
 import shutil
 import sys
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 from cupt.i18n import _
 
@@ -152,6 +152,41 @@ def format_date(timestamp: Optional[Any]) -> str:
         return dt.strftime("%Y-%m-%d %H:%M")
     except (ValueError, OSError, TypeError):
         return _("Invalid date")
+
+
+def format_comment_author(comment: Dict[str, Any], default: str = "Unknown") -> str:
+    """Return the display author from ClickUp comment payload variants."""
+    user = comment.get("user")
+    if isinstance(user, dict):
+        username = user.get("username")
+        if username:
+            return str(username)
+    user_name = comment.get("user_name")
+    if user_name:
+        return str(user_name)
+    return default
+
+
+def format_comment_text(comment: Dict[str, Any]) -> str:
+    """Return plain text from ClickUp comment payload variants."""
+    text = comment.get("text")
+    if isinstance(text, str):
+        return text
+
+    comment_text = comment.get("comment_text")
+    if isinstance(comment_text, str):
+        return comment_text
+
+    rich_text = comment.get("comment")
+    if isinstance(rich_text, list):
+        parts = [
+            part.get("text", "")
+            for part in rich_text
+            if isinstance(part, dict) and isinstance(part.get("text"), str)
+        ]
+        return "".join(parts)
+
+    return ""
 
 
 def truncate_text(text: str, max_length: Optional[int] = 50) -> str:

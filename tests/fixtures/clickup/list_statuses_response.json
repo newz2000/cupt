@@ -1,0 +1,18 @@
+{
+  "statuses": [
+    {
+      "id": "status_open_fixture",
+      "status": "open",
+      "type": "open",
+      "orderindex": 0,
+      "color": "#87909e"
+    },
+    {
+      "id": "status_done_fixture",
+      "status": "complete",
+      "type": "closed",
+      "orderindex": 1,
+      "color": "#2ecd6f"
+    }
+  ]
+}

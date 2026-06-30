@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 import pytest
 
 from cupt.utils import (
+    format_comment_author,
+    format_comment_text,
     format_date,
     format_duration,
     format_task_status,
@@ -67,6 +69,36 @@ def test_format_date():
     assert "2025-12-30" in format_date("1767088800000")  # String ts
     assert format_date(None) == "No date"
     assert format_date("not a ts") == "Invalid date"
+
+
+def test_format_comment_text_accepts_clickup_comment_text():
+    assert format_comment_text({"comment_text": "Real ClickUp note"}) == (
+        "Real ClickUp note"
+    )
+
+
+def test_format_comment_text_accepts_rich_comment_blocks():
+    comment = {
+        "comment": [
+            {"text": "Line one", "attributes": {}},
+            {"text": "\n", "attributes": {"block-id": "block-1"}},
+            {"text": "Line two", "attributes": {}},
+        ]
+    }
+    assert format_comment_text(comment) == "Line one\nLine two"
+
+
+def test_format_comment_text_prefers_existing_text():
+    assert format_comment_text({"text": "Normalized note", "comment_text": "Raw"}) == (
+        "Normalized note"
+    )
+
+
+def test_format_comment_author_accepts_clickup_user_and_normalized_name():
+    assert (
+        format_comment_author({"user": {"username": "ClickUp User"}}) == "ClickUp User"
+    )
+    assert format_comment_author({"user_name": "Connector User"}) == "Connector User"
 
 
 def test_parse_due_date_none_and_empty():

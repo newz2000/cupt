@@ -101,6 +101,9 @@ quote-style = "double"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-q"
+markers = [
+    "live_e2e: opt-in tests that create temporary ClickUp data and require network/auth",
+]
 
 [tool.coverage.run]
 source = ["cupt"]

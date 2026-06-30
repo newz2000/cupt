@@ -30,6 +30,21 @@ def test_list_notes(mock_config, mock_client):
         assert "Comment 1" in result.output
 
 
+def test_list_notes_displays_clickup_comment_text(mock_config, mock_client):
+    runner = CliRunner()
+    mock_client.get_task_comments.return_value = [
+        {
+            "user": {"username": "test"},
+            "comment_text": "Real ClickUp note",
+            "date": 12345,
+        }
+    ]
+    with patch(_MODULE, return_value=_ctx(mock_config, mock_client)):
+        result = runner.invoke(list_notes, ["abc"])
+        assert result.exit_code == 0
+        assert "Real ClickUp note" in result.output
+
+
 def test_notes_auth_error():
     runner = CliRunner()
     with patch("cupt.context.ConfigManager") as mock_cm:
