@@ -260,18 +260,16 @@ troubleshooting stays searchable. Click's built-in help headings such as
 ```python
 from cupt import ClickUpClient, TaskService, APIError
 
-client = ClickUpClient("pk_xxxxxxxxxxxxxxxx")     # personal API token
+client = ClickUpClient("pk_xxxxxxxxxxxxxxxx")  # personal API token
 service = TaskService(client)
 
 try:
     tasks = service.list_tasks(
         workspace_id="123456",
-        tags=["urgent"],          # server-side filter
+        tags=["urgent"],  # server-side filter
         include_closed=False,
     )
-    urgent_billing = service.filter_by_tags(
-        tasks, required=["urgent", "billing"]
-    )
+    urgent_billing = service.filter_by_tags(tasks, required=["urgent", "billing"])
     for t in urgent_billing:
         print(t["id"], t["name"])
 except APIError as e:
