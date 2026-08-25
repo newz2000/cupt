@@ -25,6 +25,10 @@ user impact are not listed.
   command help, common human-facing messages, and catalog drift checks.
 
 ### Fixed
+- Fixed the test suite writing to the developer's real `~/.cupt`. Any test that
+  exercised a CLI command persisted an active task and short IDs to the home
+  directory of whoever ran `pytest`; tests now run against a per-test
+  `CUPT_HOME`.
 - Fixed `cupt context`, `cupt notes`, and `cupt show --notes` rendering blank
   comments for ClickUp API payloads that carry note bodies in `comment_text`
   or rich `comment` segments.
