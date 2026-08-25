@@ -197,12 +197,18 @@ Interactive mode presents one task at a time and accepts `[w]ork`, `[s]kip`, `[d
 
 ### 10. Pipe everything
 
-Every read command supports `--json`:
+`list`, `show`, `context`, `notes`, `statuses`, `teams`, `summary`, `work`, and
+`add` all take `--json`:
 
 ```bash
 cupt list --tag ai_ready --json | jq '.[] | .name'
 cupt statuses <task-id> --json    # agent-friendly: target + all statuses
+cupt list --json | head -5        # closing the pipe early is not an error
 ```
+
+Failures exit non-zero and write nothing to stdout, so a broken pipeline is
+distinguishable from an empty one — `cupt list --json` on an expired token
+exits 5, not 0 with `[]`.
 
 Shell completion snippets for bash, zsh, and fish live in `docs/shell-completion.md`. Agent JSON and exit-code contracts live in `docs/agent-contract.md`.
 

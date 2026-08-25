@@ -67,11 +67,11 @@ incomplete information.
 cupt show <id> --json
 
 # Check existing comments before adding a duplicate note
-cupt notes <id>
+cupt notes <id> --json
 
 # Check parent and sibling tasks before completing
 # (completing a subtask when the parent is blocked is usually wrong)
-cupt context <id>
+cupt context <id> --json
 ```
 
 ---

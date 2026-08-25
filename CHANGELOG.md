@@ -19,6 +19,11 @@ user impact are not listed.
   test for comment rendering, status resolution, and read command contracts.
 
 ### Changed
+- The bundled agent skill now documents the exit codes and how to branch on
+  them, notes which commands actually have `--json`, and covers using
+  `CUPT_HOME` to act as a separate ClickUp identity. `docs/agent-contract.md`
+  does not ship with the skill, so agents installing it had no exit-code
+  guidance at all.
 - Documented local real-workspace performance verification and corrected
   `--all --team` timing guidance.
 - Marked the package as `1.0.0b2` for the second v1.0 beta.
