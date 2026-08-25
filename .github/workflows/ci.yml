@@ -26,6 +26,8 @@ jobs:
         run: ruff check .
       - name: Test with coverage
         run: pytest --cov=cupt --cov-report=term-missing --cov-fail-under=80
+      - name: Check per-module coverage floors
+        run: python scripts/check_coverage.py
       - name: Check non-interactive CLI surface
         run: CUPT_INTERACTIVE=0 pytest tests/test_non_interactive_contract.py
       - name: Check translation catalogs

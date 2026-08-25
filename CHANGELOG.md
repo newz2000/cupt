@@ -19,6 +19,10 @@ user impact are not listed.
   hand; on a remote host a timeout offers the same. The pasted URL's `state` is
   validated exactly as a real callback's would be, so remote sign-in keeps the
   CSRF protection rather than trading it away.
+- Added `scripts/check_coverage.py`, which enforces the per-module coverage
+  floors in PLAN.md's v1.0 readiness criteria. The existing `--cov-fail-under`
+  gate only checks the project total, so a critical module could fall below 80%
+  without CI noticing — `auth.py` had drifted to 73%.
 - Added sanitized ClickUp payload fixture tests and an opt-in live ClickUp E2E
   test for comment rendering, status resolution, and read command contracts.
 
