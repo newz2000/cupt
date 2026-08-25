@@ -10,9 +10,10 @@ Guidelines for humans and AI assistants making changes to `cupt`.
 ```bash
 python -m venv venv && source venv/bin/activate
 pip install -e .
-pytest                                      # 186 tests, ~0.3s
+pytest                                      # 404 tests, ~0.8s
 pytest tests/test_tasks.py::test_list_tasks_cli   # single test
 pytest --cov=cupt --cov-report=term-missing       # with coverage
+python scripts/check_coverage.py            # per-module floors (after a --cov run)
 ```
 
 The pre-commit hook (see below) enforces formatting and lint. Install

@@ -8,9 +8,14 @@ Entry style: each release lists user-visible changes grouped under
 (bug fixes), and **Removed** (deletions). Internal refactors with no
 user impact are not listed.
 
-## [Unreleased]
+## [1.0.0] — 2026-08-24
 
 ### Added
+- `cupt work` sequential focus mode for walking a filtered queue with work, skip, done, and quit actions.
+- `cupt summary --json` for agent-readable daily summary data.
+- v1.0 agent contract and deprecation policy docs.
+- GitHub Actions CI for Ruff, tests with coverage, non-interactive contract checks, translation catalog checks, and package builds.
+- gettext/Babel-compatible i18n scaffold with `--lang`, `CUPT_LANG`, a source catalog, and a Spanish proof-of-concept catalog.
 - Added `CUPT_HOME`, which relocates the config, cache, and state directory
   (default `~/.cupt`) so one install can hold several ClickUp accounts, each
   with its own token, default workspace, caches, and active task.
@@ -31,6 +36,7 @@ user impact are not listed.
   test for comment rendering, status resolution, and read command contracts.
 
 ### Changed
+- Development tooling now exposes a `dev` extra for CI/test dependencies.
 - **Security:** `cupt auth`'s OAuth flow now sends an unguessable `state` value
   and rejects any callback that doesn't carry it. The local callback server
   previously accepted any request to `localhost:4321` bearing a `code`, so a
@@ -47,7 +53,6 @@ user impact are not listed.
   guidance at all.
 - Documented local real-workspace performance verification and corrected
   `--all --team` timing guidance.
-- Marked the package as `1.0.0b2` for the second v1.0 beta.
 - Expanded the Spanish beta localization proof of concept with translated CLI
   command help, common human-facing messages, and catalog drift checks.
 
@@ -96,18 +101,6 @@ user impact are not listed.
 - Fixed `cupt context`, `cupt notes`, and `cupt show --notes` rendering blank
   comments for ClickUp API payloads that carry note bodies in `comment_text`
   or rich `comment` segments.
-
-## [1.0.0] — 2026-06-11
-
-### Added
-- `cupt work` sequential focus mode for walking a filtered queue with work, skip, done, and quit actions.
-- `cupt summary --json` for agent-readable daily summary data.
-- v1.0 agent contract and deprecation policy docs.
-- GitHub Actions CI for Ruff, tests with coverage, non-interactive contract checks, translation catalog checks, and package builds.
-- gettext/Babel-compatible i18n scaffold with `--lang`, `CUPT_LANG`, a source catalog, and a Spanish proof-of-concept catalog.
-
-### Changed
-- Development tooling now exposes a `dev` extra for CI/test dependencies.
 
 ### Removed
 - Removed `cupt done --auto-note` and the local Apple Intelligence helper so v1.0 does not freeze an unsupported AI-note contract.
