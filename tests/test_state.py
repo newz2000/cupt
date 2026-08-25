@@ -162,3 +162,32 @@ def test_save_is_atomic(tmp_path):
     leftovers = list(tmp_path.glob(".state.*.tmp"))
     assert leftovers == []
     assert (tmp_path / "state.json").exists()
+
+
+# ---------------------------------------------------------------------------
+# CUPT_HOME — multi-account isolation
+# ---------------------------------------------------------------------------
+
+
+def test_state_defaults_to_home_dot_cupt(monkeypatch, tmp_path):
+    monkeypatch.delenv("CUPT_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert StateManager().state_file == tmp_path / ".cupt" / "state.json"
+
+
+def test_state_follows_cupt_home(monkeypatch, tmp_path):
+    monkeypatch.setenv("CUPT_HOME", str(tmp_path / "work"))
+    assert StateManager().state_file == tmp_path / "work" / "state.json"
+
+
+def test_active_task_does_not_leak_between_cupt_homes(monkeypatch, tmp_path):
+    """The active task is per-account: starting a task under one CUPT_HOME
+    must be invisible to another."""
+    monkeypatch.setenv("CUPT_HOME", str(tmp_path / "work"))
+    StateManager().set_active("868abc", "Work task")
+
+    monkeypatch.setenv("CUPT_HOME", str(tmp_path / "personal"))
+    assert StateManager().get_active() is None
+
+    monkeypatch.setenv("CUPT_HOME", str(tmp_path / "work"))
+    assert StateManager().get_active()["clickup_id"] == "868abc"

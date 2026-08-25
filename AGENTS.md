@@ -134,6 +134,17 @@ upload a corrupted file**. Guards:
 - `tests/test_api.py::test_session_has_no_global_content_type`
 - `tests/test_api.py::test_upload_task_attachment_no_json_content_type`
 
+### `ConfigManager` caches until the file changes, not forever
+The in-memory cache is invalidated by comparing the config file's
+`(mtime_ns, size)`, and `set()` always re-reads first because it is a
+read-modify-write of the whole file. Do not "optimize" either back into a
+lifetime cache: two managers on one file used to erase each other's
+writes, which is how `cupt auth` lost its OAuth token on every sign-in
+from 0.3.0 onward. Guards:
+- `tests/test_config.py::test_two_managers_do_not_erase_each_others_writes`
+- `tests/test_config.py::test_interleaved_writes_survive_one_timestamp_tick`
+- `tests/test_auth.py::test_oauth_token_survives_the_caller_writing_user_details`
+
 ### `ConfigManager.__init__` does no I/O
 Constructing a `ConfigManager` must not create `~/.cupt/` or read any
 file. Library users may instantiate it just for the API client.

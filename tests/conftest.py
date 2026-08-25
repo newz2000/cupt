@@ -13,6 +13,9 @@ Pattern for auth-error tests (testing the guard itself):
     with patch('cupt.context.ConfigManager') as mock_cm:
         mock_cm.return_value.is_authenticated.return_value = False
         ...
+
+An autouse fixture points CUPT_HOME at a temp directory for every test, so no
+test can read or write the real ~/.cupt.
 """
 
 import json
@@ -23,6 +26,18 @@ import pytest
 from click.testing import CliRunner
 
 _FIXTURE_DIR = Path(__file__).parent / "fixtures"
+
+
+@pytest.fixture(autouse=True)
+def isolated_cupt_home(tmp_path, monkeypatch):
+    """Keep every test out of the developer's real ~/.cupt.
+
+    `StateManager()` and `ConfigManager()` take no arguments in the CLI paths,
+    so any test that exercises a command writes the active task, short IDs,
+    and caches to the home directory of whoever runs pytest — clobbering their
+    real active task. Point CUPT_HOME at a per-test directory instead.
+    """
+    monkeypatch.setenv("CUPT_HOME", str(tmp_path / "cupt-home"))
 
 
 @pytest.fixture

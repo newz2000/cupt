@@ -1,7 +1,7 @@
 """
 Per-user local state for interactive cupt sessions.
 
-Persists two things to ``~/.cupt/state.json``:
+Persists two things to ``~/.cupt/state.json`` (or ``$CUPT_HOME/state.json``):
 
 - ``short_ids``: Taskwarrior-style stable integer IDs for "my pending" tasks.
   ``cupt list`` reconciles them so the lowest free integer is assigned to each
@@ -21,6 +21,8 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from cupt.config import cupt_home
+
 logger = logging.getLogger(__name__)
 
 _STATE_VERSION = 1
@@ -33,7 +35,7 @@ class StateManager:
         if state_path is not None:
             self.state_file = state_path
         else:
-            self.state_file = Path.home() / ".cupt" / "state.json"
+            self.state_file = cupt_home() / "state.json"
         self._state: Optional[Dict[str, Any]] = None
 
     # -- file I/O --------------------------------------------------------
