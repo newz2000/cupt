@@ -14,7 +14,7 @@ CUPT stands for "ClickUP Terminal," a command-line interface for accessing your 
 - **Attachments** — list, download, and upload files on tasks.
 - **Flexible auth** — OAuth or Personal API Token.
 - **Offline support** — `cupt list` transparently caches what it just showed; `cupt show <id> --offline` works without a network. `cupt prefetch` populates the cache eagerly.
-- **JSON output everywhere** — every read command supports `--json` for piping into `jq` or feeding an agent.
+- **JSON for everything scriptable** — `list`, `show`, `context`, `notes`, `statuses`, `teams`, `summary`, `work`, and `add` all take `--json` for piping into `jq` or feeding an agent. The stateful helpers (`active`, `tags`, `time status`) stay human-only by design.
 - **Agent skill bundled** — `skill/cupt-clickup/` is a portable SKILL.md that teaches Claude Code, OpenCode, Codex, and other agents how to drive cupt efficiently. See [For AI agents](#for-ai-agents) below.
 
 ## Installation
@@ -233,12 +233,18 @@ Interactive mode presents one task at a time and accepts `[w]ork`, `[s]kip`, `[d
 
 ### 10. Pipe everything
 
-Every read command supports `--json`:
+`list`, `show`, `context`, `notes`, `statuses`, `teams`, `summary`, `work`, and
+`add` all take `--json`:
 
 ```bash
 cupt list --tag ai_ready --json | jq '.[] | .name'
 cupt statuses <task-id> --json    # agent-friendly: target + all statuses
+cupt list --json | head -5        # closing the pipe early is not an error
 ```
+
+Failures exit non-zero and write nothing to stdout, so a broken pipeline is
+distinguishable from an empty one — `cupt list --json` on an expired token
+exits 5, not 0 with `[]`.
 
 Shell completion snippets for bash, zsh, and fish live in `docs/shell-completion.md`. Agent JSON and exit-code contracts live in `docs/agent-contract.md`.
 
@@ -253,7 +259,7 @@ You now know enough to be productive. The command reference below is a quicker r
 | `cupt teams` | List ClickUp teams (user-groups) in the workspace |
 | `cupt list [--overdue\|--today\|--week] [--tag X] [--no-tag X] [--team X] [--mine\|--all] [--json] [--offline]` | List tasks with stackable filters. Interactive sessions get a `#` short-ID column. |
 | `cupt show [<id>] [--notes] [--json] [--offline]` | Full task details. Falls back to the active task when no ID is given. |
-| `cupt context [<id>]` | Parent + sibling/subtask view. Falls back to active. |
+| `cupt context [<id>] [--show-completed] [--json]` | Parent + sibling/subtask view. Falls back to active. |
 | `cupt statuses <id> [--list] [--json]` | Show available statuses for a task's list (or pass `--list <list-id>`) |
 | `cupt done [<id>] [--note "…"] [--dry-run]` | Mark complete; clears the active pointer on success. `--dry-run` previews the resolved status. |
 | `cupt add "<name>" [--list X] [--parent <id\|this>] [--blocks <id\|this>] [-d "…"] [--due …] [--tag X] [--json]` | Create a new task. Defaults: active task's list, you as assignee, no link. |
@@ -262,7 +268,7 @@ You now know enough to be productive. The command reference below is a quicker r
 | `cupt summary [--all] [--json]` | Daily due/overdue/completed/time summary. |
 | `cupt tag add\|remove <id> <name>` | Tag management |
 | `cupt time start [<id>]` / `cupt time stop` / `cupt time add [<id>] <dur>` / `cupt time status` | Time tracking. `start` and `add` fall back to the active task. |
-| `cupt note [<id>] "<text>"` / `cupt notes [<id>]` | Add or list comments; both fall back to the active task. |
+| `cupt note [<id>] "<text>"` / `cupt notes [<id>] [--json]` | Add or list comments; both fall back to the active task. |
 | `cupt attach list\|add\|get <id> [args]` | Attachment management |
 | `cupt prefetch` | Cache details for the current task set for offline use |
 | Global: `--interactive` / `--no-interactive`, `--lang`, `CUPT_INTERACTIVE=1\|0`, `CUPT_LANG` | Force interactive (short IDs + active task) or stateless mode. Default: enabled when stdout is a TTY. |

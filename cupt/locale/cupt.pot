@@ -505,9 +505,6 @@ msgstr ""
 msgid "No workspaces found - you may need to join one in ClickUp"
 msgstr ""
 
-msgid "Not authenticated. Run 'cupt auth' first."
-msgstr ""
-
 msgid "Not authenticated. Run 'cupt auth' to authenticate."
 msgstr ""
 
@@ -517,7 +514,7 @@ msgstr ""
 msgid "Note added to task {task_id}"
 msgstr ""
 
-msgid "Note: {message}"
+msgid "Note: {note}"
 msgstr ""
 
 msgid "Notes"
@@ -569,6 +566,12 @@ msgid "Open this URL on a machine with a browser:"
 msgstr ""
 
 msgid "Opening browser for authentication..."
+msgstr ""
+
+msgid "Output context as JSON"
+msgstr ""
+
+msgid "Output notes as JSON"
 msgstr ""
 
 msgid "Output raw status data as JSON, plus the resolved target."

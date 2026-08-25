@@ -21,11 +21,26 @@ JSON shapes for read commands.
 | 4 | Invalid user input or validation failure. |
 | 5 | ClickUp API or network failure. |
 
+Every code in this table is asserted by `tests/test_exit_codes.py`. Two notes:
+
+- Click emits its own exit code 2 for usage errors (unknown flag, missing
+  argument). It overlaps code 2 here; both mean "cannot proceed as asked", and
+  the stderr message distinguishes them.
+- A failure never writes to stdout, so `cupt list --json | jq` on a dead token
+  yields nothing *and* a non-zero status rather than silently empty success.
+- Closing the read end of the pipe early (`| head`) is not a failure. cupt uses
+  the default SIGPIPE disposition, so it dies quietly like any other filter
+  instead of reporting an API error.
+
 ## Non-interactive mode
 
 Set `CUPT_INTERACTIVE=0` or pass `--no-interactive` to disable stateful UX:
 short-ID resolution, active-task fallback, and prompts. Commands that require a
 prompt fail cleanly instead of blocking.
+
+`active`, `tags`, and `time status` have no `--json`: they report interactive
+session state rather than ClickUp data. `cupt active` exits 0 and prints nothing
+in a non-interactive session, so it is safe as a probe.
 
 ## JSON schemas
 
@@ -43,6 +58,22 @@ preserves ClickUp objects unless noted.
 ```json
 {"task": {}, "parent": null, "comments": []}
 ```
+
+### `cupt context --json`
+
+```json
+{"task": {}, "notes": [], "parent_task": null, "siblings": [], "is_subtask": false}
+```
+
+`siblings` excludes completed tasks unless `--show-completed` is passed.
+
+### `cupt notes --json`
+
+```json
+{"task_id": "task_id", "notes": []}
+```
+
+An empty `notes` array is a successful result, not a warning.
 
 ### `cupt statuses --json`
 
@@ -69,6 +100,15 @@ preserves ClickUp objects unless noted.
   "completed_today": [],
   "time_entries": []
 }
+```
+
+### `cupt add --json`
+
+The created task, passed through from ClickUp unchanged. `id` and `name` are
+always present; everything else is whatever ClickUp returns for a new task.
+
+```json
+{"id": "task_id", "name": "Task name"}
 ```
 
 ### `cupt work --json`

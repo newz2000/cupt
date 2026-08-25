@@ -1,8 +1,9 @@
 import click
 
 from cupt.context import get_client_context
+from cupt.errors import fail
 from cupt.i18n import format_message
-from cupt.utils import print_error, print_success
+from cupt.utils import print_success
 
 
 @click.group(name="tag")
@@ -28,7 +29,7 @@ def add_tag(task_id, tag_name):
             )
         )
     except Exception as e:
-        print_error(format_message("Failed to add tag: {error}", error=e))
+        fail(format_message("Failed to add tag: {error}", error=e), e)
 
 
 @tag_group.command("remove")
@@ -50,4 +51,4 @@ def remove_tag(task_id, tag_name):
             )
         )
     except Exception as e:
-        print_error(format_message("Failed to remove tag: {error}", error=e))
+        fail(format_message("Failed to remove tag: {error}", error=e), e)

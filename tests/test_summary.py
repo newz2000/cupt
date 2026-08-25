@@ -5,6 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from cupt.errors import EXIT_API
+from cupt.exceptions import APIError
 from cupt.summary import summary_cmd
 from cupt.utils import format_duration
 
@@ -262,12 +264,12 @@ def test_summary_api_error(runner, mock_config, mock_client):
     with patch(
         "cupt.summary.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.get_workspace_tasks.side_effect = Exception("Network error")
+        mock_client.get_workspace_tasks.side_effect = APIError("Request failed")
         mock_client.get_time_entries.return_value = []
         mock_client.get_running_timer.return_value = None
 
         result = runner.invoke(summary_cmd)
-        assert result.exit_code == 0
+        assert result.exit_code == EXIT_API
         assert "Failed to fetch summary data" in result.output
 
 

@@ -22,7 +22,15 @@ _SHORT_ID_RE = re.compile(r"^\d+$")
 
 
 class IDResolutionError(ValueError):
-    """Raised when a task identifier can't be resolved to a ClickUp ID."""
+    """Raised when a task identifier can't be resolved to a ClickUp ID.
+
+    ``not_found`` separates "you named something that doesn't exist" (exit 3)
+    from "you didn't give me enough to work with" (exit 4).
+    """
+
+    def __init__(self, message: str, not_found: bool = False):
+        super().__init__(message)
+        self.not_found = not_found
 
 
 def resolve_task_id(
@@ -63,7 +71,8 @@ def resolve_task_id(
         if entry is None:
             raise IDResolutionError(
                 f"No short ID {arg} — run `cupt list` to refresh, "
-                "or pass the full ClickUp task ID."
+                "or pass the full ClickUp task ID.",
+                not_found=True,
             )
         return entry["clickup_id"]
 

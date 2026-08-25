@@ -4,6 +4,7 @@ import pytest
 from click.testing import CliRunner
 
 from cupt import __version__
+from cupt.errors import EXIT_AUTH
 from cupt.main import cli
 
 
@@ -51,15 +52,11 @@ def test_status_authenticated():
 
 def test_teams_lists_user_groups():
     runner = CliRunner()
-    with patch("cupt.main.ConfigManager") as mock_config, patch(
-        "cupt.main.ClickUpClient"
-    ) as mock_client:
-        mock_config.return_value.is_authenticated.return_value = True
-        mock_config.return_value.get.side_effect = lambda key, default=None: {
-            "auth.access_token": "token",
-            "user.workspace_id": "workspace1",
-        }.get(key, default)
-        mock_client.return_value.get_teams.return_value = [
+    config, client = MagicMock(), MagicMock()
+    with patch(
+        "cupt.main.get_client_context", return_value=(config, client, "workspace1")
+    ):
+        client.get_teams.return_value = [
             {"id": "g1", "name": "MattTech", "members": [{"id": "u1"}, {"id": "u2"}]},
             {"id": "g2", "name": "AI Agent", "members": []},
         ]
@@ -69,14 +66,16 @@ def test_teams_lists_user_groups():
         assert "AI Agent" in result.output
         assert "g1" in result.output
         # Workspace id was resolved from config, not the CLI.
-        mock_client.return_value.get_teams.assert_called_once_with("workspace1")
+        client.get_teams.assert_called_once_with("workspace1")
 
 
 def test_teams_not_authenticated():
+    """`cupt teams` used to warn and exit 0, unlike every other command."""
     runner = CliRunner()
-    with patch("cupt.main.ConfigManager") as mock_config:
+    with patch("cupt.context.ConfigManager") as mock_config:
         mock_config.return_value.is_authenticated.return_value = False
         result = runner.invoke(cli, ["teams"])
+        assert result.exit_code == EXIT_AUTH
         assert "Not authenticated" in result.output
 
 

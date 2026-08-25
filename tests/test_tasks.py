@@ -1144,3 +1144,26 @@ def test_statuses_handles_missing_list(runner, mock_config, mock_client):
         mock_client.get_task.return_value = {"id": "t1", "list": {}}
         result = runner.invoke(statuses_cmd, ["t1"])
         assert "Could not find list" in result.output
+
+
+def test_context_json_emits_the_service_payload(runner, mock_config, mock_client):
+    mock_client.get_task.return_value = {
+        "id": "868abc",
+        "name": "Parent",
+        "parent": None,
+    }
+    mock_client.get_task_comments.return_value = [{"id": "c1", "comment_text": "hi"}]
+    mock_client.get_task_children.return_value = [
+        {"id": "868def", "name": "Child", "status": {"type": "open"}}
+    ]
+    with patch(
+        "cupt.tasks.get_client_context",
+        return_value=(mock_config, mock_client, "workspace1"),
+    ):
+        result = runner.invoke(context_cmd, ["868abc", "--json"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert set(payload) == {"task", "notes", "parent_task", "siblings", "is_subtask"}
+    assert payload["task"]["id"] == "868abc"
+    assert payload["siblings"][0]["id"] == "868def"

@@ -23,13 +23,13 @@ from typing import Optional
 import click
 
 from cupt.context import get_client_context
+from cupt.errors import EXIT_AUTH, EXIT_INVALID_INPUT, fail
 from cupt.i18n import _, format_message
 from cupt.resolver import IDResolutionError, resolve_task_id
 from cupt.state import StateManager
 from cupt.utils import (
     is_interactive,
     parse_due_date,
-    print_error,
     print_success,
     print_warning,
 )
@@ -148,13 +148,13 @@ def add_cmd(
             list_id = config.get("user.default_list_id")
 
     if not list_id:
-        print_error(
+        fail(
             _(
                 "No list specified. Pass `--list <id>` or set a default with "
                 "`cupt config --default-list <id>`."
-            )
+            ),
+            code=EXIT_AUTH,
         )
-        return
 
     # --- resolve --parent and --blocks --------------------------------------
     link_state = state if state is not None else StateManager()
@@ -162,8 +162,7 @@ def add_cmd(
         parent_id = _resolve_link_target(parent, link_state, "parent")
         blocks_id = _resolve_link_target(blocks, link_state, "blocks")
     except IDResolutionError as e:
-        print_error(str(e))
-        return
+        fail(str(e), e)
 
     # --- build payload -------------------------------------------------------
     payload = {"name": name}
@@ -184,8 +183,7 @@ def add_cmd(
             payload["due_date"] = parse_due_date(due)
             payload["due_date_time"] = True
         except ValueError as e:
-            print_error(str(e))
-            return
+            fail(str(e), code=EXIT_INVALID_INPUT)
 
     if tags:
         payload["tags"] = list(tags)
@@ -197,8 +195,7 @@ def add_cmd(
     try:
         created = client.create_task(list_id, payload)
     except Exception as e:
-        print_error(format_message("Failed to create task: {error}", error=e))
-        return
+        fail(format_message("Failed to create task: {error}", error=e), e)
 
     new_id = created.get("id")
 

@@ -506,9 +506,6 @@ msgstr "No hay ningún temporizador en ejecución."
 msgid "No workspaces found - you may need to join one in ClickUp"
 msgstr "No se encontraron espacios de trabajo; quizá debas unirte a uno en ClickUp"
 
-msgid "Not authenticated. Run 'cupt auth' first."
-msgstr "No autenticado. Ejecuta 'cupt auth' primero."
-
 msgid "Not authenticated. Run 'cupt auth' to authenticate."
 msgstr "No autenticado. Ejecuta 'cupt auth' para autenticarte."
 
@@ -518,8 +515,8 @@ msgstr "No establecido"
 msgid "Note added to task {task_id}"
 msgstr "Nota agregada a la tarea {task_id}"
 
-msgid "Note: {message}"
-msgstr "Nota: {message}"
+msgid "Note: {note}"
+msgstr "Nota: {note}"
 
 msgid "Notes"
 msgstr "Notas"
@@ -571,6 +568,12 @@ msgstr "Abre esta URL en un equipo con navegador:"
 
 msgid "Opening browser for authentication..."
 msgstr "Abriendo el navegador para autenticar..."
+
+msgid "Output context as JSON"
+msgstr "Mostrar el contexto en JSON"
+
+msgid "Output notes as JSON"
+msgstr "Mostrar las notas en JSON"
 
 msgid "Output raw status data as JSON, plus the resolved target."
 msgstr "Emitir datos de estado sin procesar como JSON, más el destino resuelto."

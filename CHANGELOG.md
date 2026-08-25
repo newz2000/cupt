@@ -23,6 +23,10 @@ user impact are not listed.
   floors in PLAN.md's v1.0 readiness criteria. The existing `--cov-fail-under`
   gate only checks the project total, so a critical module could fall below 80%
   without CI noticing — `auth.py` had drifted to 73%.
+- Added `--json` to `cupt context` and `cupt notes`, the two read commands an
+  agent would plausibly script. `active`, `tags`, and `time status` remain
+  human-only by design, and the README no longer claims every read command has
+  it.
 - Added sanitized ClickUp payload fixture tests and an opt-in live ClickUp E2E
   test for comment rendering, status resolution, and read command contracts.
 
@@ -36,6 +40,11 @@ user impact are not listed.
 - **Security:** the OAuth callback's failure page now escapes the `error` query
   parameter instead of interpolating it into HTML, closing a reflected-XSS hole
   on the `localhost:4321` origin during the sign-in window.
+- The bundled agent skill now documents the exit codes and how to branch on
+  them, notes which commands actually have `--json`, and covers using
+  `CUPT_HOME` to act as a separate ClickUp identity. `docs/agent-contract.md`
+  does not ship with the skill, so agents installing it had no exit-code
+  guidance at all.
 - Documented local real-workspace performance verification and corrected
   `--all --team` timing guidance.
 - Marked the package as `1.0.0b2` for the second v1.0 beta.
@@ -66,6 +75,24 @@ user impact are not listed.
 - Corrected the OAuth app setup steps printed by `cupt auth`: ClickUp moved app
   creation behind a "ClickUp API Settings" tab, and the button is "Create an
   App", so the old steps dead-ended at the settings page.
+- Fixed `cupt <read command> --json | head` reporting `Failed to list tasks:
+  [Errno 32] Broken pipe`. Python ignores SIGPIPE and raises `BrokenPipeError`
+  instead, which the command handlers treated as an API failure; cupt now uses
+  the default SIGPIPE disposition and exits quietly like any other filter.
+- **Agent contract:** commands now exit with the codes `docs/agent-contract.md`
+  documents. Only code 2 was ever raised; 3, 4, and 5 appeared nowhere in the
+  code, so a dead token, a missing task, and an empty result set were all
+  indistinguishable exit 0. `cupt work` and `cupt prefetch` additionally leaked
+  a raw Python traceback on API failure.
+- `cupt teams` warned and exited 0 when unauthenticated, where every sibling
+  command errors and exits 2. It now uses the shared authentication guard.
+- `ClickUpClient.get_running_timer` swallowed every exception and returned
+  `None`, so `cupt time status` reported "no timer running" on an expired
+  token. Only a 404 now means "nothing running".
+- Fixed `cupt time add <id> <duration> -m "<note>"` erroring after the entry was
+  already created. The note confirmation passed `message=` to `format_message`,
+  whose own first parameter is `message`, raising `TypeError`. The command
+  exited 0 despite printing an error, so the failure went unnoticed.
 - Fixed `cupt context`, `cupt notes`, and `cupt show --notes` rendering blank
   comments for ClickUp API payloads that carry note bodies in `comment_text`
   or rich `comment` segments.

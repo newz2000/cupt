@@ -270,12 +270,22 @@ class ClickUpClient:
         return self._make_request("POST", f"/team/{workspace_id}/time_entries/stop")
 
     def get_running_timer(self, workspace_id: str) -> Optional[Dict[str, Any]]:
+        """The workspace's running time entry, or None when nothing is running.
+
+        Swallowing every exception here made a dead token indistinguishable
+        from an idle timer: `cupt time status` reported "no timer running" and
+        exited 0. Only a 404 means "nothing running" — ClickUp may answer
+        either that or a 200 with a null body, and both land on None. Anything
+        else (401, 5xx, a timeout) is a real failure and propagates.
+        """
         try:
             return self._make_request(
                 "GET", f"/team/{workspace_id}/time_entries/current"
             ).get("data")
-        except Exception:
-            return None
+        except APIError as e:
+            if "HTTP 404" in str(e):
+                return None
+            raise
 
     def get_time_entries(
         self,

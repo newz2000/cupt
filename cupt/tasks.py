@@ -6,6 +6,7 @@ from typing import Optional
 import click
 
 from cupt.context import get_client_context
+from cupt.errors import EXIT_AUTH, EXIT_NOT_FOUND, fail
 from cupt.i18n import _, format_message
 from cupt.resolver import IDResolutionError, resolve_task_id
 from cupt.services.task_service import TaskService
@@ -293,10 +294,10 @@ def list_tasks(
 
     active_workspace_id = workspace_id or config_workspace_id
     if not active_workspace_id:
-        print_error(
-            _("Workspace ID not set. Run 'cupt config --workspace-id <id>' first.")
+        fail(
+            _("Workspace ID not set. Run 'cupt config --workspace-id <id>' first."),
+            code=EXIT_AUTH,
         )
-        return []
 
     user_id = config.get("user.user_id")
 
@@ -391,8 +392,7 @@ def list_tasks(
         return tasks
 
     except Exception as e:
-        print_error(format_message("Failed to list tasks: {error}", error=e))
-        return []
+        fail(format_message("Failed to list tasks: {error}", error=e), e)
 
 
 def _background_cache_tasks(client, config, tasks, timeout: float = 2.0) -> int:
@@ -565,8 +565,7 @@ def show_task_cmd(task_id, notes, offline, as_json):
     try:
         task_id = resolve_task_id(task_id)
     except IDResolutionError as e:
-        print_error(str(e))
-        return
+        fail(str(e), e)
     return show_task(task_id, notes, offline, as_json)
 
 
@@ -591,8 +590,10 @@ def show_task(
             if as_json:
                 click.echo("null")
             else:
-                print_error(format_message("Task {task_id} not found", task_id=task_id))
-            return
+                fail(
+                    format_message("Task {task_id} not found", task_id=task_id),
+                    code=EXIT_NOT_FOUND,
+                )
 
         p_id = task.get("parent")
 
@@ -638,7 +639,7 @@ def show_task(
         _display_task(task, parent_task, comments, include_notes)
 
     except Exception as e:
-        print_error(format_message("Failed to show task: {error}", error=e))
+        fail(format_message("Failed to show task: {error}", error=e), e)
 
 
 def _display_task(task, parent_task, comments, include_notes: bool):
@@ -794,15 +795,18 @@ def prefetch_cmd(limit, workspace_id):
 
     active_workspace_id = workspace_id or config_workspace_id
     if not active_workspace_id:
-        print_error(
-            _("Workspace ID not set. Run 'cupt config --workspace-id <id>' first.")
+        fail(
+            _("Workspace ID not set. Run 'cupt config --workspace-id <id>' first."),
+            code=EXIT_AUTH,
         )
-        return
 
     user_id = config.get("user.user_id")
 
     service = TaskService(client)
-    tasks = service.list_tasks(workspace_id=active_workspace_id, user_id=user_id)
+    try:
+        tasks = service.list_tasks(workspace_id=active_workspace_id, user_id=user_id)
+    except Exception as e:
+        fail(format_message("Failed to list tasks: {error}", error=e), e)
 
     if not tasks:
         print_warning(_("No tasks found."))
@@ -905,8 +909,7 @@ def complete_task_cmd(task_id, note, dry_run):
     try:
         task_id = resolve_task_id(task_id)
     except IDResolutionError as e:
-        print_error(str(e))
-        return
+        fail(str(e), e)
     return complete_task(task_id, note, dry_run)
 
 
@@ -956,7 +959,7 @@ def complete_task(
     except ValueError as e:
         print_error(str(e))
     except Exception as e:
-        print_error(format_message("Failed to complete task: {error}", error=e))
+        fail(format_message("Failed to complete task: {error}", error=e), e)
 
 
 # ---------------------------------------------------------------------------
@@ -1057,7 +1060,7 @@ def show_statuses(identifier: str, is_list: bool = False, as_json: bool = False)
     except ValueError as e:
         print_error(str(e))
     except Exception as e:
-        print_error(format_message("Failed to fetch statuses: {error}", error=e))
+        fail(format_message("Failed to fetch statuses: {error}", error=e), e)
 
 
 # context
@@ -1067,17 +1070,19 @@ def show_statuses(identifier: str, is_list: bool = False, as_json: bool = False)
 @click.command(name="context")
 @click.argument("task_id", required=False)
 @click.option("--show-completed", is_flag=True, help="Include completed subtasks")
-def context_cmd(task_id, show_completed):
+@click.option("--json", "as_json", is_flag=True, help="Output context as JSON")
+def context_cmd(task_id, show_completed, as_json):
     """Show task context (parent, siblings, subtasks). Falls back to active task."""
     try:
         task_id = resolve_task_id(task_id)
     except IDResolutionError as e:
-        print_error(str(e))
-        return
-    return show_context(task_id, show_completed)
+        fail(str(e), e)
+    return show_context(task_id, show_completed, as_json)
 
 
-def show_context(task_id: str, show_completed: bool = False):
+def show_context(
+    task_id: str, show_completed: bool = False, as_json: bool = False
+) -> None:
     """Display a task's parent, notes, and siblings/subtasks."""
     _config, client, workspace_id = get_client_context()
     if not client:
@@ -1087,7 +1092,13 @@ def show_context(task_id: str, show_completed: bool = False):
         service = TaskService(client)
         ctx = service.get_task_context(task_id, workspace_id, show_completed)
         if not ctx:
-            print_error(format_message("Task {task_id} not found", task_id=task_id))
+            fail(
+                format_message("Task {task_id} not found", task_id=task_id),
+                code=EXIT_NOT_FOUND,
+            )
+
+        if as_json:
+            click.echo(json.dumps(ctx, indent=2))
             return
 
         task = ctx["task"]
@@ -1159,4 +1170,4 @@ def show_context(task_id: str, show_completed: bool = False):
         click.echo("\n")
 
     except Exception as e:
-        print_error(format_message("Failed to show context: {error}", error=e))
+        fail(format_message("Failed to show context: {error}", error=e), e)

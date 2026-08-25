@@ -11,10 +11,34 @@ description: "Use this skill when an AI agent needs to list, filter, inspect,
 # cupt — ClickUp CLI for AI Agents
 
 Use cupt (not the ClickUp MCP server or direct API) for routine task operations.
-One cupt command replaces 3–5 API round-trips. Every read command supports
-`--json` for structured output; errors and progress go to stderr so pipes are
-reliable. The stable v1.0 JSON and exit-code contract is documented in
-`docs/agent-contract.md`.
+One cupt command replaces 3–5 API round-trips. `list`, `show`, `context`,
+`notes`, `statuses`, `teams`, `summary`, `work`, and `add` all take `--json`;
+errors and progress go to stderr so pipes are reliable. `active`, `tags`, and
+`time status` are human-only and have no `--json`.
+
+## Exit codes — branch on these, not on message text
+
+Every command reports failure through its exit status. Check it before parsing
+stdout; on any non-zero exit stdout is empty.
+
+| Code | Meaning | What to do |
+| ---: | ------- | ---------- |
+| 0 | Success. | Parse stdout. An empty list is success, not an error. |
+| 1 | Generic failure. | Report the stderr text to the user. |
+| 2 | Not authenticated, or no workspace configured. | Stop. Ask the user to run `cupt auth`; you cannot do this for them. |
+| 3 | The task, list, or short ID does not exist. | Re-read the ID. Don't retry unchanged. |
+| 4 | Invalid input, or a command that needs a prompt in a non-interactive session. | Fix the arguments. Retrying identically will fail identically. |
+| 5 | ClickUp API or network failure. | Transient; one retry is reasonable, then report. |
+
+```bash
+if ! tasks=$(cupt list --tag ai_ready --json); then
+  echo "cupt failed with $?" >&2      # stdout is empty; stderr has the reason
+  exit 1
+fi
+```
+
+Closing a pipe early (`cupt list --json | head`) is not a failure — cupt exits
+quietly like any other filter.
 
 ## Setup verification (run before first use)
 
@@ -29,7 +53,7 @@ If `cupt --version` fails with "command not found":
 > (recommended) or `pip install cupt`. See <https://github.com/newz2000/cupt>
 > for details."* Do not attempt to install it yourself.
 
-If `cupt status` reports "Not authenticated":
+If `cupt status` exits 2 (it reports "Not authenticated"):
 
 > Tell the user: *"cupt is not authenticated. Please run `cupt auth`
 > interactively to set up credentials."* You cannot complete this step on the
@@ -73,7 +97,7 @@ with `--tag`.
 ```bash
 cupt show <id> [--json]      # description, status, assignees, tags, list
 cupt show <id> --notes       # also include all comments
-cupt context <id>            # parent task + siblings/subtasks
+cupt context <id> [--json]   # parent task + siblings/subtasks
 ```
 
 ## Complete a task — always resolve status first
@@ -99,7 +123,7 @@ cupt tag add <id> <tag-name>
 cupt tag remove <id> <tag-name>
 
 cupt note <id> "Your comment"
-cupt notes <id>              # list all comments
+cupt notes <id> [--json]     # list all comments
 ```
 
 ## Create a task
@@ -138,7 +162,7 @@ cupt work --tag ai_ready --json    # inspect the focus queue without prompting
 
 ## Interactive-only features (inert for agents)
 
-cupt 0.8 adds two features for human users that **never activate** when
+cupt has two features for human users that **never activate** when
 stdout is piped, when `CI=true`, when `--no-interactive` is passed, or
 when `CUPT_INTERACTIVE=0` is set:
 
@@ -149,6 +173,19 @@ Agents should always pass full ClickUp IDs. A pure-integer argument
 (e.g. `cupt show 3`) in non-interactive mode is passed straight to the
 ClickUp API rather than resolved as a short ID, which will surface as a
 404 — so agent code is never silently bound to a human's local state file.
+
+## Running as a separate identity
+
+`CUPT_HOME` selects which credentials and state cupt uses (default `~/.cupt`).
+Point it at its own directory to act as a different ClickUp user without
+touching the human's profile, active task, or caches:
+
+```bash
+CUPT_HOME=~/.cupt-agent cupt list --tag ai_ready --json
+```
+
+Each profile authenticates once, separately. Whoever that profile's token
+belongs to is who ClickUp attributes comments and status changes to.
 
 ## Gotchas
 
