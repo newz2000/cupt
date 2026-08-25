@@ -23,6 +23,8 @@ don't aren't on the path to 1.0.
    is exercised in CI.
 3. **Solo focus mode shipped** (`cupt work` / `cupt gtd`, item below).
 4. **Test coverage ≥ 80 %** in `api`, `services/`, `tasks`, `auth`.
+   Enforced per-module by `scripts/check_coverage.py` in CI; the
+   `--cov-fail-under` gate only covers the project total.
 5. **i18n infrastructure in place** with at least one non-English
    language available (rough pass; quality polish can continue
    post-1.0). See section E.
