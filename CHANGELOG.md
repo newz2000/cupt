@@ -34,6 +34,11 @@ user impact are not listed.
   exercised a CLI command persisted an active task and short IDs to the home
   directory of whoever ran `pytest`; tests now run against a per-test
   `CUPT_HOME`.
+- Fixed `cupt work` logging time against the wrong task. Choosing `[w]ork` on a
+  second task moved the active pointer but left the timer running on the first,
+  because the running-timer check is workspace-scoped rather than per-task. The
+  timer now follows the active task, and `[d]one` no longer stops a timer that
+  belongs to a different task.
 - Fixed `cupt context`, `cupt notes`, and `cupt show --notes` rendering blank
   comments for ClickUp API payloads that carry note bodies in `comment_text`
   or rich `comment` segments.

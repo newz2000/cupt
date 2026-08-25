@@ -802,6 +802,9 @@ msgstr "Estados"
 msgid "Stop current time tracking"
 msgstr "Detener el seguimiento de tiempo actual"
 
+msgid "Stopped the timer on {previous} — now timing this task"
+msgstr "Se ha detenido el temporizador de {previous}: ahora se cronometra esta tarea"
+
 msgid "Stopped: {task_id} — {name}"
 msgstr "Detenida: {task_id} — {name}"
 

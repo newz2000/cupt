@@ -215,7 +215,7 @@ cupt work --today
 cupt work --team MattTech --json   # inspect the queue without prompting
 ```
 
-Interactive mode presents one task at a time and accepts `[w]ork`, `[s]kip`, `[d]one`, or `[q]uit`. Selecting work sets the active task and starts a timer when possible; selecting done resolves the task's completion status per list.
+Interactive mode presents one task at a time and accepts `[w]ork`, `[s]kip`, `[d]one`, or `[q]uit`. Selecting work sets the active task and moves the running timer onto it — if a timer was already running on an earlier task, cupt stops it and says so, so the active task and the timer never disagree. Selecting done resolves the task's completion status per list and stops the timer only if it belongs to that task.
 
 ### 10. Pipe everything
 
