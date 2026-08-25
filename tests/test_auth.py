@@ -244,3 +244,146 @@ def test_callback_error_page_escapes_the_query_string(manager):
     body = b"".join(call.args[0] for call in handler.wfile.write.call_args_list)
     assert b"<script>" not in body
     assert b"&lt;script&gt;alert(1)&lt;/script&gt;" in body
+
+
+# ---------------------------------------------------------------------------
+# remote sign-in: paste the redirect instead of catching it on a socket
+# ---------------------------------------------------------------------------
+
+
+def _redirect(manager, code="GOOD", state=None):
+    state = manager.state if state is None else state
+    return f"http://localhost:4321/?code={code}&state={state}"
+
+
+def test_parse_redirect_accepts_a_full_url(manager):
+    code, state = manager._parse_redirect(_redirect(manager))
+    assert code == "GOOD"
+    assert state == manager.state
+
+
+def test_parse_redirect_tolerates_surrounding_quotes(manager):
+    code, _state = manager._parse_redirect(f'"{_redirect(manager)}"')
+    assert code == "GOOD"
+
+
+def test_parse_redirect_accepts_a_bare_code(manager):
+    assert manager._parse_redirect("  ABC123  ") == ("ABC123", None)
+
+
+def test_parse_redirect_rejects_a_url_without_a_code(manager):
+    assert manager._parse_redirect("http://localhost:4321/?error=denied")[0] is None
+    assert manager._parse_redirect("")[0] is None
+
+
+def test_pasted_redirect_with_matching_state_exchanges(manager):
+    with patch.object(
+        manager, "_exchange_code_for_tokens", return_value={"access_token": "t"}
+    ) as exchange, patch("cupt.auth.click.prompt", return_value=_redirect(manager)):
+        result = manager._prompt_for_redirect()
+
+    assert result == {"access_token": "t"}
+    exchange.assert_called_once_with("GOOD")
+
+
+def test_pasted_redirect_with_wrong_state_is_refused(manager):
+    """The paste path keeps the CSRF check rather than exempting remote users."""
+    with patch.object(manager, "_exchange_code_for_tokens") as exchange, patch(
+        "cupt.auth.click.prompt", return_value=_redirect(manager, "EVIL", "attacker")
+    ):
+        result = manager._prompt_for_redirect()
+
+    assert result is None
+    exchange.assert_not_called()
+
+
+def test_pasted_bare_code_is_accepted(manager):
+    """No state to check when the user carried the value across by hand."""
+    with patch.object(
+        manager, "_exchange_code_for_tokens", return_value={"access_token": "t"}
+    ) as exchange, patch("cupt.auth.click.prompt", return_value="BARECODE"):
+        manager._prompt_for_redirect()
+
+    exchange.assert_called_once_with("BARECODE")
+
+
+def test_pasted_url_without_a_code_reports_and_stops(manager):
+    with patch.object(manager, "_exchange_code_for_tokens") as exchange, patch(
+        "cupt.auth.click.prompt", return_value="http://localhost:4321/?error=denied"
+    ):
+        assert manager._prompt_for_redirect() is None
+
+    exchange.assert_not_called()
+
+
+def test_no_browser_skips_the_socket_entirely(manager):
+    with patch.object(
+        manager, "_prompt_for_redirect", return_value={"access_token": "t"}
+    ) as prompt, patch.object(manager, "_start_callback_server") as server, patch(
+        "cupt.auth.webbrowser.open"
+    ) as browser:
+        result = manager.start_oauth_flow(no_browser=True)
+
+    assert result == {"access_token": "t"}
+    prompt.assert_called_once()
+    server.assert_not_called()
+    browser.assert_not_called()
+
+
+def test_authorize_url_is_shown_for_no_browser(manager, capsys):
+    with patch.object(manager, "_prompt_for_redirect", return_value=None):
+        manager.start_oauth_flow(no_browser=True)
+
+    assert manager.authorize_url() in capsys.readouterr().out
+
+
+def test_pressing_x_during_the_wait_switches_to_paste(manager):
+    """The shortcut must be live during the wait, not only after it expires."""
+    fake_stdin = MagicMock()
+    fake_stdin.isatty.return_value = True
+    fake_stdin.readline.return_value = "x\n"
+
+    with patch("cupt.auth.HTTPServer") as server_cls, patch(
+        "cupt.auth.sys.stdin", fake_stdin
+    ), patch(
+        "cupt.auth.select.select", return_value=([fake_stdin], [], [])
+    ), patch.object(
+        manager, "_prompt_for_redirect", return_value={"access_token": "t"}
+    ) as prompt:
+        result = manager._start_callback_server()
+
+    assert result == {"access_token": "t"}
+    prompt.assert_called_once()
+    server_cls.return_value.server_close.assert_called_once()
+
+
+def test_timeout_offers_the_paste_when_interactive(manager):
+    """A timeout on a remote host means the redirect went elsewhere."""
+    fake_stdin = MagicMock()
+    fake_stdin.isatty.return_value = True
+
+    with patch("cupt.auth.HTTPServer"), patch("cupt.auth.sys.stdin", fake_stdin), patch(
+        "cupt.auth.select.select", return_value=([], [], [])
+    ), patch("cupt.auth.time.time", side_effect=[0, 0, 999]), patch.object(
+        manager, "_prompt_for_redirect", return_value={"access_token": "t"}
+    ) as prompt:
+        result = manager._start_callback_server()
+
+    assert result == {"access_token": "t"}
+    prompt.assert_called_once()
+
+
+def test_non_tty_never_offers_the_paste(manager):
+    """Scripts get the old clean timeout, not a prompt they cannot answer."""
+    fake_stdin = MagicMock()
+    fake_stdin.isatty.return_value = False
+
+    with patch("cupt.auth.HTTPServer"), patch("cupt.auth.sys.stdin", fake_stdin), patch(
+        "cupt.auth.select.select", return_value=([], [], [])
+    ), patch("cupt.auth.time.time", side_effect=[0, 0, 999]), patch.object(
+        manager, "_prompt_for_redirect"
+    ) as prompt:
+        result = manager._start_callback_server()
+
+    assert result is None
+    prompt.assert_not_called()

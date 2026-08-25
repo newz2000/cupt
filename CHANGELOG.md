@@ -11,6 +11,11 @@ user impact are not listed.
 ## [Unreleased]
 
 ### Added
+- `cupt auth` can now complete OAuth on a machine the browser can't reach. Press
+  `x` during the wait, or pass `--no-browser`, to paste the redirect URL by
+  hand; on a remote host a timeout offers the same. The pasted URL's `state` is
+  validated exactly as a real callback's would be, so remote sign-in keeps the
+  CSRF protection rather than trading it away.
 - Added sanitized ClickUp payload fixture tests and an opt-in live ClickUp E2E
   test for comment rendering, status resolution, and read command contracts.
 

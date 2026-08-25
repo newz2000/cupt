@@ -5,6 +5,9 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
+msgid "   (keep this exact value even when running cupt over SSH)"
+msgstr ""
+
 msgid "  Nothing completed today."
 msgstr ""
 
@@ -116,6 +119,9 @@ msgstr ""
 msgid "Already authenticated with Personal API Token"
 msgstr ""
 
+msgid "Approve access in the browser, then copy the URL from its address bar. The page will fail to load — that is expected."
+msgstr ""
+
 msgid "Assignee"
 msgstr ""
 
@@ -144,6 +150,9 @@ msgid "Authenticated as: {username}"
 msgstr ""
 
 msgid "Authenticated with Personal API Token"
+msgstr ""
+
+msgid "Authentication cancelled"
 msgstr ""
 
 msgid "Authentication failed"
@@ -469,7 +478,13 @@ msgstr ""
 msgid "No attachments on {task_id}."
 msgstr ""
 
+msgid "No authorization code found in that value."
+msgstr ""
+
 msgid "No cached data available. Run 'cupt list' while online first."
+msgstr ""
+
+msgid "No callback arrived on this host."
 msgstr ""
 
 msgid "No date"
@@ -580,6 +595,9 @@ msgstr ""
 msgid "Only tasks with this tag (repeatable; tasks must have ALL tags given)"
 msgstr ""
 
+msgid "Open this URL on a machine with a browser:"
+msgstr ""
+
 msgid "Opening browser for authentication..."
 msgstr ""
 
@@ -620,6 +638,9 @@ msgid "Parent Description"
 msgstr ""
 
 msgid "Partial offline data (list cache, {minutes}m old). Run 'cupt prefetch' for full details and notes."
+msgstr ""
+
+msgid "Paste the redirect URL (or just the code)"
 msgstr ""
 
 msgid "Persistent cache cleared"
@@ -671,6 +692,9 @@ msgid "Resolve and print the target status without modifying the task. Useful fo
 msgstr ""
 
 msgid "Response: {response}"
+msgstr ""
+
+msgid "Running cupt on another machine? The browser cannot reach this host — press x then Enter to paste the URL instead."
 msgstr ""
 
 msgid "SIBLINGS (Subtasks of {parent_id})"
@@ -750,6 +774,9 @@ msgstr ""
 msgid "Size"
 msgstr ""
 
+msgid "Skip the browser and paste the redirect URL (for remote/SSH sessions)"
+msgstr ""
+
 msgid "Skipped: {task_id}"
 msgstr ""
 
@@ -817,6 +844,9 @@ msgid "Task {task_id} not found."
 msgstr ""
 
 msgid "Task {task_id} not in offline cache. Run 'cupt prefetch' or 'cupt show <id>' online first."
+msgstr ""
+
+msgid "That URL belongs to a different sign-in attempt. Nothing was saved — run `cupt auth` again."
 msgstr ""
 
 msgid "Time tracking commands"

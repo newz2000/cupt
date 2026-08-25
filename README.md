@@ -53,6 +53,20 @@ cupt auth
 
 You'll be asked to pick OAuth or a Personal API Token. **For most users a Personal API Token is faster** — grab one from <https://app.clickup.com/settings/apps> (it starts with `pk_`) and paste it when prompted. OAuth is the right choice if you're sharing this install with a team.
 
+#### Signing in on a remote machine
+
+OAuth normally catches ClickUp's redirect on a local `http://localhost:4321` listener. When cupt runs over SSH that listener is on the *remote* host, while your browser's `localhost` is your laptop — so the redirect never arrives and the sign-in times out.
+
+Two ways through, no port-forward required:
+
+```bash
+cupt auth --no-browser    # print the URL, paste the redirect back
+```
+
+Or start the normal flow and press **x** then Enter at the "Waiting for authentication" prompt to switch to pasting at any point. Either way you open the URL on whatever machine has a browser, approve, and copy the URL from the address bar — the page itself won't load, which is expected. cupt reads the code out of it and checks the `state` value exactly as it would on a real callback, so remote sign-in is no less protected than local.
+
+Keep the app's redirect URL as `http://localhost:4321` regardless; it never has to resolve for the paste flow to work.
+
 After auth, `cupt` automatically picks your first workspace as the default and you're ready to go:
 
 ```bash

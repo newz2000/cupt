@@ -93,7 +93,12 @@ def cli():
 
 
 @cli.command()
-def auth():
+@click.option(
+    "--no-browser",
+    is_flag=True,
+    help="Skip the browser and paste the redirect URL (for remote/SSH sessions)",
+)
+def auth(no_browser):
     """Authenticate with ClickUp using OAuth"""
     config = ConfigManager()
 
@@ -167,6 +172,7 @@ def auth():
         click.echo(_("2. Open the 'ClickUp API Settings' tab at the top"))
         click.echo(_("3. Click 'Create an App'"))
         click.echo(_("4. Set redirect URL to: http://localhost:4321"))
+        click.echo(_("   (keep this exact value even when running cupt over SSH)"))
         click.echo(_("5. Copy your Client ID and Client Secret"))
         click.echo()
 
@@ -181,7 +187,7 @@ def auth():
 
         # Start OAuth flow
         oauth_manager = OAuthManager(client_id, client_secret)
-        tokens = oauth_manager.start_oauth_flow()
+        tokens = oauth_manager.start_oauth_flow(no_browser=no_browser)
 
         if tokens:
             # Get user info to populate team/user data
