@@ -5,6 +5,9 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
+msgid "   (keep this exact value even when running cupt over SSH)"
+msgstr "   (mantén este valor exacto incluso al ejecutar cupt por SSH)"
+
 msgid "  Nothing completed today."
 msgstr "  Nada completado hoy."
 
@@ -41,20 +44,23 @@ msgstr "1. Ve a: https://app.clickup.com/settings/apps"
 msgid "1. OAuth (recommended for teams)"
 msgstr "1. OAuth (recomendado para equipos)"
 
-msgid "2. Click 'Create new app'"
-msgstr "2. Haz clic en 'Create new app'"
-
 msgid "2. Copy your Personal API Token (starts with 'pk_')"
 msgstr "2. Copia tu token personal de API (empieza con 'pk_')"
+
+msgid "2. Open the 'ClickUp API Settings' tab at the top"
+msgstr "2. Abre la pestaña 'ClickUp API Settings' en la parte superior"
 
 msgid "2. Personal API Token (simpler, individual use)"
 msgstr "2. Token personal de API (más simple, uso individual)"
 
-msgid "3. Set redirect URL to: http://localhost:4321"
-msgstr "3. Configura la URL de redirección como: http://localhost:4321"
+msgid "3. Click 'Create an App'"
+msgstr "3. Haz clic en 'Create an App'"
 
-msgid "4. Copy your Client ID and Client Secret"
-msgstr "4. Copia tu Client ID y Client Secret"
+msgid "4. Set redirect URL to: http://localhost:4321"
+msgstr "4. Establece la URL de redirección en: http://localhost:4321"
+
+msgid "5. Copy your Client ID and Client Secret"
+msgstr "5. Copia tu Client ID y Client Secret"
 
 msgid "; hit page cap — pair with --tag for full coverage"
 msgstr "; alcanzó el límite de páginas; combínalo con --tag para cobertura completa"
@@ -92,6 +98,9 @@ msgstr "Se agregó {duration} a la tarea {task_id}"
 msgid "Already authenticated with Personal API Token"
 msgstr "Ya está autenticado con un token personal de API"
 
+msgid "Approve access in the browser, then copy the URL from its address bar. The page will fail to load — that is expected."
+msgstr "Autoriza el acceso en el navegador y copia la URL de la barra de direcciones. La página no cargará: es lo esperado."
+
 msgid "Assignee"
 msgstr "Asignado"
 
@@ -121,6 +130,9 @@ msgstr "Autenticado como: {username}"
 
 msgid "Authenticated with Personal API Token"
 msgstr "Autenticado con token personal de API"
+
+msgid "Authentication cancelled"
+msgstr "Autenticación cancelada"
 
 msgid "Authentication failed"
 msgstr "La autenticación falló"
@@ -437,8 +449,14 @@ msgstr "Ningún adjunto coincide con '{selector}'."
 msgid "No attachments on {task_id}."
 msgstr "No hay adjuntos en {task_id}."
 
+msgid "No authorization code found in that value."
+msgstr "No se encontró ningún código de autorización en ese valor."
+
 msgid "No cached data available. Run 'cupt list' while online first."
 msgstr "No hay datos en caché. Ejecuta 'cupt list' mientras estás en línea primero."
+
+msgid "No callback arrived on this host."
+msgstr "No llegó ninguna respuesta a este host."
 
 msgid "No date"
 msgstr "Sin fecha"
@@ -548,6 +566,9 @@ msgstr "Solo tareas con esta etiqueta"
 msgid "Only tasks with this tag (repeatable; tasks must have ALL tags given)"
 msgstr "Solo tareas con esta etiqueta (repetible; las tareas deben tener TODAS las etiquetas indicadas)"
 
+msgid "Open this URL on a machine with a browser:"
+msgstr "Abre esta URL en un equipo con navegador:"
+
 msgid "Opening browser for authentication..."
 msgstr "Abriendo el navegador para autenticar..."
 
@@ -590,6 +611,9 @@ msgstr "Descripción del padre"
 msgid "Partial offline data (list cache, {minutes}m old). Run 'cupt prefetch' for full details and notes."
 msgstr "Datos sin conexión parciales (caché de lista de hace {minutes} min). Ejecuta 'cupt prefetch' para detalles y notas completos."
 
+msgid "Paste the redirect URL (or just the code)"
+msgstr "Pega la URL de redirección (o solo el código)"
+
 msgid "Persistent cache cleared"
 msgstr "Caché persistente borrada"
 
@@ -623,6 +647,9 @@ msgstr "Imprimir la cola de trabajo como JSON"
 msgid "Priority"
 msgstr "Prioridad"
 
+msgid "Rejected a sign-in callback that did not match this session. Nothing was saved — run `cupt auth` again."
+msgstr "Se rechazó una respuesta de inicio de sesión que no coincide con esta sesión. No se guardó nada: ejecuta `cupt auth` de nuevo."
+
 msgid "Remove a tag from a task"
 msgstr "Quitar una etiqueta de una tarea"
 
@@ -637,6 +664,9 @@ msgstr "Resolver e imprimir el estado objetivo sin modificar la tarea. Útil par
 
 msgid "Response: {response}"
 msgstr "Respuesta: {response}"
+
+msgid "Running cupt on another machine? The browser cannot reach this host — press x then Enter to paste the URL instead."
+msgstr "¿Ejecutas cupt en otro equipo? El navegador no puede llegar a este host: pulsa x y Enter para pegar la URL."
 
 msgid "SIBLINGS (Subtasks of {parent_id})"
 msgstr "HERMANAS (subtareas de {parent_id})"
@@ -710,6 +740,9 @@ msgstr "Mostrar resumen de todo el espacio de trabajo en lugar de solo tus tarea
 msgid "Size"
 msgstr "Tamaño"
 
+msgid "Skip the browser and paste the redirect URL (for remote/SSH sessions)"
+msgstr "Omite el navegador y pega la URL de redirección (para sesiones remotas/SSH)"
+
 msgid "Skipped: {task_id}"
 msgstr "Omitida: {task_id}"
 
@@ -781,6 +814,9 @@ msgstr "No se encontró la tarea {task_id}."
 
 msgid "Task {task_id} not in offline cache. Run 'cupt prefetch' or 'cupt show <id>' online first."
 msgstr "La tarea {task_id} no está en la caché sin conexión. Ejecuta 'cupt prefetch' o 'cupt show <id>' en línea primero."
+
+msgid "That URL belongs to a different sign-in attempt. Nothing was saved — run `cupt auth` again."
+msgstr "Esa URL pertenece a otro intento de inicio de sesión. No se guardó nada: ejecuta `cupt auth` de nuevo."
 
 msgid "Time tracking commands"
 msgstr "Comandos de seguimiento de tiempo"

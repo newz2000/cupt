@@ -14,10 +14,24 @@ user impact are not listed.
 - Added `CUPT_HOME`, which relocates the config, cache, and state directory
   (default `~/.cupt`) so one install can hold several ClickUp accounts, each
   with its own token, default workspace, caches, and active task.
+- `cupt auth` can now complete OAuth on a machine the browser can't reach. Press
+  `x` during the wait, or pass `--no-browser`, to paste the redirect URL by
+  hand; on a remote host a timeout offers the same. The pasted URL's `state` is
+  validated exactly as a real callback's would be, so remote sign-in keeps the
+  CSRF protection rather than trading it away.
 - Added sanitized ClickUp payload fixture tests and an opt-in live ClickUp E2E
   test for comment rendering, status resolution, and read command contracts.
 
 ### Changed
+- **Security:** `cupt auth`'s OAuth flow now sends an unguessable `state` value
+  and rejects any callback that doesn't carry it. The local callback server
+  previously accepted any request to `localhost:4321` bearing a `code`, so a
+  page visited during the 120-second sign-in window could bind the install to
+  an attacker's ClickUp account. A rejected callback aborts the flow
+  immediately instead of waiting out the timeout.
+- **Security:** the OAuth callback's failure page now escapes the `error` query
+  parameter instead of interpolating it into HTML, closing a reflected-XSS hole
+  on the `localhost:4321` origin during the sign-in window.
 - Documented local real-workspace performance verification and corrected
   `--all --team` timing guidance.
 - Marked the package as `1.0.0b2` for the second v1.0 beta.
@@ -39,6 +53,15 @@ user impact are not listed.
   because the running-timer check is workspace-scoped rather than per-task. The
   timer now follows the active task, and `[d]one` no longer stops a timer that
   belongs to a different task.
+- Fixed `cupt auth` reporting a successful OAuth sign-in without storing the
+  token. `OAuthManager` built its own `ConfigManager`, and since each instance
+  caches file contents for its lifetime, the workspace/user ids written
+  afterwards by the command's separate instance overwrote the freshly saved
+  credentials from a pre-token snapshot. The OAuth path has not persisted a
+  token since the cache was introduced in 0.3.0.
+- Corrected the OAuth app setup steps printed by `cupt auth`: ClickUp moved app
+  creation behind a "ClickUp API Settings" tab, and the button is "Create an
+  App", so the old steps dead-ended at the settings page.
 - Fixed `cupt context`, `cupt notes`, and `cupt show --notes` rendering blank
   comments for ClickUp API payloads that carry note bodies in `comment_text`
   or rich `comment` segments.

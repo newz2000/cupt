@@ -2,12 +2,17 @@
 OAuth authentication for ClickUp API v1 (updated)
 """
 
+import html
+import secrets
+import select
+import sys
 import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Any, Dict, Optional
-from urllib.parse import parse_qs, urlparse
+from typing import Any, Dict, Optional, Tuple
+from urllib.parse import parse_qs, urlencode, urlparse
 
+import click
 import requests
 
 from cupt.config import ConfigManager
@@ -40,6 +45,21 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
 
         # Check for authorization code
         if "code" in query_params:
+            # Anything can reach a listening localhost port, so a code alone
+            # proves nothing about who started this flow. Only accept a
+            # callback carrying the state we generated for this session.
+            if not self.auth_manager.verify_state(query_params.get("state", [None])[0]):
+                self.auth_manager.state_mismatch = True
+                self.send_response(400)
+                self.send_header("Content-type", "text/html")
+                self.end_headers()
+                self.wfile.write(
+                    b"<html><body><h1>Authentication Failed</h1>"
+                    b"<p>This callback did not match the pending sign-in. "
+                    b"Nothing was saved.</p></body></html>"
+                )
+                return
+
             code = query_params["code"][0]
 
             # Send response to browser
@@ -67,11 +87,13 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
             self.send_header("Content-type", "text/html")
             self.end_headers()
 
+            # `error` is attacker-controllable query-string text rendered on
+            # the localhost origin — escape it rather than interpolating raw.
             error_html = f"""
             <html>
                 <body>
                     <h1>Authentication Failed</h1>
-                    <p>Error: {error}</p>
+                    <p>Error: {html.escape(error)}</p>
                 </body>
             </html>
             """
@@ -90,21 +112,56 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
 class OAuthManager:
     """Manage OAuth authentication flow"""
 
-    def __init__(self, client_id: str, client_secret: str):
+    def __init__(
+        self,
+        client_id: str,
+        client_secret: str,
+        config: Optional[ConfigManager] = None,
+    ):
         self.client_id = client_id
         self.client_secret = client_secret
         self.callback_port = 4321
         self.auth_code = None
         self.received = False
-        self.config = ConfigManager()
+        self.state = secrets.token_urlsafe(32)
+        self.state_mismatch = False
+        # Share the caller's manager. ConfigManager caches its contents for the
+        # lifetime of the instance, so a second one here would hold a snapshot
+        # taken before the token was written and silently overwrite it on its
+        # next save — see tests/test_auth.py::test_oauth_token_survives_the_
+        # caller_writing_user_details.
+        self.config = config if config is not None else ConfigManager()
 
-    def start_oauth_flow(self) -> Optional[Dict[str, Any]]:
-        """Start OAuth authentication flow"""
-        # Use OAuth v2 authorize endpoint as documented
-        redirect_uri = f"http://localhost:{self.callback_port}"
+    def verify_state(self, received: Optional[str]) -> bool:
+        """Whether a callback's ``state`` belongs to this session."""
+        if not received:
+            return False
+        return secrets.compare_digest(received, self.state)
 
-        # Use OAuth v2 authorize endpoint with proper encoding
-        auth_url = f"https://app.clickup.com/api?client_id={self.client_id}&redirect_uri={redirect_uri}"
+    def authorize_url(self) -> str:
+        """The ClickUp authorize URL for this session, state included."""
+        query = urlencode(
+            {
+                "client_id": self.client_id,
+                "redirect_uri": f"http://localhost:{self.callback_port}",
+                "state": self.state,
+            }
+        )
+        return f"https://app.clickup.com/api?{query}"
+
+    def start_oauth_flow(self, no_browser: bool = False) -> Optional[Dict[str, Any]]:
+        """Run the OAuth flow.
+
+        ``no_browser`` skips straight to pasting the redirect by hand, which is
+        the only thing that works when cupt runs somewhere the browser can't
+        reach — see :meth:`_prompt_for_redirect`.
+        """
+        auth_url = self.authorize_url()
+
+        if no_browser:
+            print_info(_("Open this URL on a machine with a browser:"))
+            print_info(auth_url)
+            return self._prompt_for_redirect()
 
         print_info(_("Opening browser for authentication..."))
         print_info(
@@ -120,6 +177,67 @@ class OAuthManager:
 
         # Start local server to handle callback
         return self._start_callback_server()
+
+    def _can_watch_stdin(self) -> bool:
+        """Whether the wait loop can offer the paste shortcut.
+
+        ``select`` only accepts sockets on Windows, and a piped or closed stdin
+        has no keypress to give, so the shortcut is TTY-only.
+        """
+        try:
+            return sys.stdin is not None and sys.stdin.isatty()
+        except (AttributeError, ValueError):
+            return False
+
+    @staticmethod
+    def _parse_redirect(value: str) -> Tuple[Optional[str], Optional[str]]:
+        """Pull ``(code, state)`` out of a pasted redirect URL or bare code."""
+        value = value.strip().strip("\"'")
+        if not value:
+            return None, None
+        if value.startswith("http") or "?" in value or "code=" in value:
+            params = parse_qs(urlparse(value).query)
+            return params.get("code", [None])[0], params.get("state", [None])[0]
+        # A bare code, typed across by hand. There is no cross-site vector for
+        # `state` to guard against when the user is the transport.
+        return value, None
+
+    def _prompt_for_redirect(self) -> Optional[Dict[str, Any]]:
+        """Take the redirect by hand instead of catching it on a socket.
+
+        The callback server listens on the host running cupt, so over SSH the
+        browser's ``localhost`` is a different machine and the redirect never
+        arrives. Pasting the URL closes that gap without a port-forward, and
+        keeps the `state` check: it is validated out of the pasted URL exactly
+        as it would be out of a real callback.
+        """
+        print_info(
+            _(
+                "Approve access in the browser, then copy the URL from its "
+                "address bar. The page will fail to load — that is expected."
+            )
+        )
+        try:
+            pasted = click.prompt(
+                _("Paste the redirect URL (or just the code)"), type=str
+            )
+        except (EOFError, click.Abort):
+            print_error(_("Authentication cancelled"))
+            return None
+
+        code, state = self._parse_redirect(pasted)
+        if not code:
+            print_error(_("No authorization code found in that value."))
+            return None
+        if state is not None and not self.verify_state(state):
+            print_error(
+                _(
+                    "That URL belongs to a different sign-in attempt. "
+                    "Nothing was saved — run `cupt auth` again."
+                )
+            )
+            return None
+        return self._exchange_code_for_tokens(code)
 
     def _start_callback_server(self) -> Optional[Dict[str, Any]]:
         """Start local HTTP server for OAuth callback"""
@@ -137,19 +255,59 @@ class OAuthManager:
             server = HTTPServer(("localhost", self.callback_port), handler)
             server.timeout = 120  # 2 minute timeout
 
-            # Start server in current thread (blocks until callback or timeout)
+            watch_stdin = self._can_watch_stdin()
+            if watch_stdin:
+                print_info(
+                    _(
+                        "Running cupt on another machine? The browser cannot reach "
+                        "this host — press x then Enter to paste the URL instead."
+                    )
+                )
+
+            # Poll the socket and the keyboard together so the paste shortcut
+            # stays live for the whole wait rather than only after it expires.
             start_time = time.time()
-            while not self.received and (time.time() - start_time) < 120:
-                server.handle_request()
-                time.sleep(0.1)
+            while (
+                not self.received
+                and not self.state_mismatch
+                and (time.time() - start_time) < 120
+            ):
+                streams = [server] + ([sys.stdin] if watch_stdin else [])
+                try:
+                    readable = select.select(streams, [], [], 0.5)[0]
+                except OSError:
+                    # select() takes only sockets on Windows; drop the shortcut
+                    # rather than the whole wait.
+                    watch_stdin = False
+                    continue
+                if server in readable:
+                    server.handle_request()
+                    continue
+                if watch_stdin and sys.stdin in readable:
+                    if sys.stdin.readline().strip().lower() == "x":
+                        server.server_close()
+                        return self._prompt_for_redirect()
 
             server.server_close()
 
+            if self.state_mismatch:
+                print_error(
+                    _(
+                        "Rejected a sign-in callback that did not match this session. "
+                        "Nothing was saved — run `cupt auth` again."
+                    )
+                )
+                return None
             if self.received and self.auth_code:
                 return self._exchange_code_for_tokens(self.auth_code)
-            else:
-                print_error(_("Authentication timed out"))
-                return None
+            if watch_stdin:
+                # A timeout on a remote box almost always means the redirect
+                # went to the user's own machine. Offer the paste rather than
+                # making them start over.
+                print_info(_("No callback arrived on this host."))
+                return self._prompt_for_redirect()
+            print_error(_("Authentication timed out"))
+            return None
 
         except OSError as e:
             if "Address already in use" in str(e):
