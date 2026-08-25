@@ -36,6 +36,12 @@ user impact are not listed.
   command help, common human-facing messages, and catalog drift checks.
 
 ### Fixed
+- Fixed `cupt auth` reporting a successful OAuth sign-in without storing the
+  token. `OAuthManager` built its own `ConfigManager`, and since each instance
+  caches file contents for its lifetime, the workspace/user ids written
+  afterwards by the command's separate instance overwrote the freshly saved
+  credentials from a pre-token snapshot. The OAuth path has not persisted a
+  token since the cache was introduced in 0.3.0.
 - Corrected the OAuth app setup steps printed by `cupt auth`: ClickUp moved app
   creation behind a "ClickUp API Settings" tab, and the button is "Create an
   App", so the old steps dead-ended at the settings page.

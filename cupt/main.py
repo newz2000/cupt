@@ -186,7 +186,7 @@ def auth(no_browser):
             sys.exit(1)
 
         # Start OAuth flow
-        oauth_manager = OAuthManager(client_id, client_secret)
+        oauth_manager = OAuthManager(client_id, client_secret, config=config)
         tokens = oauth_manager.start_oauth_flow(no_browser=no_browser)
 
         if tokens:

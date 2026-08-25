@@ -387,3 +387,45 @@ def test_non_tty_never_offers_the_paste(manager):
 
     assert result is None
     prompt.assert_not_called()
+
+
+def test_oauth_token_survives_the_caller_writing_user_details(tmp_path):
+    """Regression: `cupt auth` reported success and stored no token.
+
+    ConfigManager caches its contents per instance. OAuthManager used to build
+    its own, so the token it wrote was overwritten moments later when main.py's
+    separate instance saved the workspace/user ids from a snapshot taken before
+    the token existed. The flow printed "Authentication successful!" and left
+    the install unauthenticated.
+    """
+    config_file = tmp_path / "config.yaml"
+    caller_config = ConfigManager(config_file)
+    caller_config.get("auth.access_token")  # main.py reads first; caches empty
+
+    manager = OAuthManager("cid", "secret", config=caller_config)
+    with patch("requests.post") as mock_post:
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.raise_for_status.return_value = None
+        mock_post.return_value.json.return_value = {
+            "access_token": "oauth_access",
+            "refresh_token": "oauth_refresh",
+        }
+        assert manager._exchange_code_for_tokens("code")["access_token"] == (
+            "oauth_access"
+        )
+
+    # main.py then records who we are, as it does after a successful flow.
+    caller_config.set("user.workspace_id", "ws1")
+    caller_config.set("user.user_id", "u1")
+
+    on_disk = ConfigManager(config_file)
+    assert on_disk.get("auth.access_token") == "oauth_access"
+    assert on_disk.get("auth.refresh_token") == "oauth_refresh"
+    assert on_disk.get("user.workspace_id") == "ws1"
+
+
+def test_oauth_manager_defaults_to_its_own_config(tmp_path):
+    """Library users constructing one directly still get a working manager."""
+    with patch("cupt.auth.ConfigManager", return_value=ConfigManager(tmp_path / "c")):
+        manager = OAuthManager("cid", "secret")
+    assert manager.config is not None

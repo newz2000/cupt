@@ -112,7 +112,12 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
 class OAuthManager:
     """Manage OAuth authentication flow"""
 
-    def __init__(self, client_id: str, client_secret: str):
+    def __init__(
+        self,
+        client_id: str,
+        client_secret: str,
+        config: Optional[ConfigManager] = None,
+    ):
         self.client_id = client_id
         self.client_secret = client_secret
         self.callback_port = 4321
@@ -120,7 +125,12 @@ class OAuthManager:
         self.received = False
         self.state = secrets.token_urlsafe(32)
         self.state_mismatch = False
-        self.config = ConfigManager()
+        # Share the caller's manager. ConfigManager caches its contents for the
+        # lifetime of the instance, so a second one here would hold a snapshot
+        # taken before the token was written and silently overwrite it on its
+        # next save — see tests/test_auth.py::test_oauth_token_survives_the_
+        # caller_writing_user_details.
+        self.config = config if config is not None else ConfigManager()
 
     def verify_state(self, received: Optional[str]) -> bool:
         """Whether a callback's ``state`` belongs to this session."""
