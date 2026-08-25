@@ -54,6 +54,12 @@ def fail(
     outright (for refusals that aren't exceptions, such as a command that needs
     a prompt in a non-interactive session).
     """
+    # A closed stdout is the reader leaving (`| head`), not a failure. On
+    # POSIX the SIGPIPE default in main.cli means we rarely get here; this
+    # covers platforms without SIGPIPE and any already-buffered write.
+    if isinstance(exc, BrokenPipeError):
+        raise click.exceptions.Exit(EXIT_OK)
+
     # click.exceptions.Exit subclasses Exception, so a fail() raised inside a
     # command's own `except Exception` block arrives back here wrapped as `exc`.
     # Re-raise it untouched: the inner call already chose the right code and

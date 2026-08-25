@@ -216,3 +216,41 @@ def test_nested_fail_keeps_the_inner_exit_code(runner, mock_config, mock_client)
     assert "not found" in result.output
     # The generic wrapper message must not bury the specific one.
     assert "Failed to fetch context" not in result.output
+
+
+# ---------------------------------------------------------------------------
+# a closed stdout is the reader leaving, not a failure
+# ---------------------------------------------------------------------------
+
+
+def test_cli_restores_default_sigpipe_handling(runner):
+    """`cupt list --json | head` reported an API failure before this.
+
+    Python ignores SIGPIPE and raises BrokenPipeError instead, which the
+    command handlers turned into "Failed to list tasks: [Errno 32] Broken
+    pipe" on stderr plus a non-zero exit.
+    """
+    signal = pytest.importorskip("signal")
+    if not hasattr(signal, "SIGPIPE"):
+        pytest.skip("no SIGPIPE on this platform")
+
+    original = signal.getsignal(signal.SIGPIPE)
+    try:
+        runner.invoke(cli, ["--version"])
+        assert signal.getsignal(signal.SIGPIPE) is signal.SIG_DFL
+    finally:
+        signal.signal(signal.SIGPIPE, original)
+
+
+def test_broken_pipe_exits_quietly(runner, mock_config, mock_client):
+    """Fallback for platforms without SIGPIPE: no message, no failure code."""
+    mock_client.get_workspace_tasks.side_effect = BrokenPipeError(32, "Broken pipe")
+    with patch(
+        "cupt.tasks.get_client_context",
+        return_value=(mock_config, mock_client, "workspace1"),
+    ):
+        result = runner.invoke(cli, ["--no-interactive", "list", "--json"])
+
+    assert result.exit_code == EXIT_OK
+    assert "Broken pipe" not in result.output
+    assert "Failed to list tasks" not in result.output

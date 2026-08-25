@@ -28,6 +28,9 @@ Every code in this table is asserted by `tests/test_exit_codes.py`. Two notes:
   the stderr message distinguishes them.
 - A failure never writes to stdout, so `cupt list --json | jq` on a dead token
   yields nothing *and* a non-zero status rather than silently empty success.
+- Closing the read end of the pipe early (`| head`) is not a failure. cupt uses
+  the default SIGPIPE disposition, so it dies quietly like any other filter
+  instead of reporting an API error.
 
 ## Non-interactive mode
 

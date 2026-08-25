@@ -3,6 +3,7 @@ Main CLI interface for CUPT
 """
 
 import logging
+import signal
 import sys
 
 import click
@@ -92,6 +93,12 @@ def _set_language_callback(ctx, param, value):
 )
 def cli():
     """CUPT - ClickUp Task Management CLI"""
+    # Python ignores SIGPIPE and turns a closed stdout into BrokenPipeError,
+    # which the command handlers then report as a failure — so the documented
+    # `cupt list --json | jq` and `| head` idioms printed an error and exited
+    # non-zero. Restore the default so cupt dies quietly like any other filter.
+    if hasattr(signal, "SIGPIPE"):
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 
 @cli.command()

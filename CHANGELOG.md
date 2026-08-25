@@ -26,6 +26,10 @@ user impact are not listed.
   command help, common human-facing messages, and catalog drift checks.
 
 ### Fixed
+- Fixed `cupt <read command> --json | head` reporting `Failed to list tasks:
+  [Errno 32] Broken pipe`. Python ignores SIGPIPE and raises `BrokenPipeError`
+  instead, which the command handlers treated as an API failure; cupt now uses
+  the default SIGPIPE disposition and exits quietly like any other filter.
 - **Agent contract:** commands now exit with the codes `docs/agent-contract.md`
   documents. Only code 2 was ever raised; 3, 4, and 5 appeared nowhere in the
   code, so a dead token, a missing task, and an empty result set were all
