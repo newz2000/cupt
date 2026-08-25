@@ -2,6 +2,7 @@
 OAuth authentication for ClickUp API v1 (updated)
 """
 
+import html
 import secrets
 import time
 import webbrowser
@@ -83,11 +84,13 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
             self.send_header("Content-type", "text/html")
             self.end_headers()
 
+            # `error` is attacker-controllable query-string text rendered on
+            # the localhost origin — escape it rather than interpolating raw.
             error_html = f"""
             <html>
                 <body>
                     <h1>Authentication Failed</h1>
-                    <p>Error: {error}</p>
+                    <p>Error: {html.escape(error)}</p>
                 </body>
             </html>
             """

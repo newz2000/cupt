@@ -234,3 +234,13 @@ def test_rejected_callback_ends_the_wait_without_exchanging(manager):
 def test_callback_server_reports_port_in_use(manager):
     with patch("cupt.auth.HTTPServer", side_effect=OSError("Address already in use")):
         assert manager._start_callback_server() is None
+
+
+def test_callback_error_page_escapes_the_query_string(manager):
+    """Regression: the error param was interpolated into HTML unescaped."""
+    handler = _handler_for(manager, "/?error=%3Cscript%3Ealert(1)%3C/script%3E")
+    _run(handler)
+
+    body = b"".join(call.args[0] for call in handler.wfile.write.call_args_list)
+    assert b"<script>" not in body
+    assert b"&lt;script&gt;alert(1)&lt;/script&gt;" in body

@@ -21,6 +21,9 @@ user impact are not listed.
   page visited during the 120-second sign-in window could bind the install to
   an attacker's ClickUp account. A rejected callback aborts the flow
   immediately instead of waiting out the timeout.
+- **Security:** the OAuth callback's failure page now escapes the `error` query
+  parameter instead of interpolating it into HTML, closing a reflected-XSS hole
+  on the `localhost:4321` origin during the sign-in window.
 - Documented local real-workspace performance verification and corrected
   `--all --team` timing guidance.
 - Marked the package as `1.0.0b2` for the second v1.0 beta.
