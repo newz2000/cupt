@@ -10,23 +10,29 @@ from typing import Optional
 import click
 
 from cupt.context import get_client_context
+from cupt.errors import EXIT_INVALID_INPUT, EXIT_NOT_FOUND, fail
 from cupt.i18n import _, format_message
 from cupt.resolver import IDResolutionError, resolve_task_id
 from cupt.state import StateManager
-from cupt.utils import is_interactive, print_error, print_success, print_warning
+from cupt.utils import is_interactive, print_success, print_warning
 
 
 def _require_interactive(command: str) -> bool:
+    """Refuse a prompt-driven command in a non-interactive session.
+
+    The contract calls this a clean failure, so it exits 4 rather than
+    reporting success to whatever is scripting cupt.
+    """
     if is_interactive():
         return True
-    print_error(
+    fail(
         format_message(
             "`cupt {command}` is interactive-only "
             "(set CUPT_INTERACTIVE=1 to force, or pass --interactive).",
             command=command,
-        )
+        ),
+        code=EXIT_INVALID_INPUT,
     )
-    return False
 
 
 @click.command(name="start")
@@ -44,8 +50,7 @@ def start_cmd(task_id: Optional[str]):
     try:
         resolved = resolve_task_id(task_id, state=state, allow_active=False)
     except IDResolutionError as e:
-        print_error(str(e))
-        return
+        fail(str(e), e)
 
     _, client, _ = get_client_context(need_workspace=False)
     if not client:
@@ -54,12 +59,13 @@ def start_cmd(task_id: Optional[str]):
     try:
         task = client.get_task(resolved)
     except Exception as e:
-        print_error(format_message("Failed to look up task: {error}", error=e))
-        return
+        fail(format_message("Failed to look up task: {error}", error=e), e)
 
     if not task:
-        print_error(format_message("Task {task_id} not found.", task_id=resolved))
-        return
+        fail(
+            format_message("Task {task_id} not found.", task_id=resolved),
+            code=EXIT_NOT_FOUND,
+        )
 
     name = task.get("name") or resolved
     previous = state.set_active(resolved, name)

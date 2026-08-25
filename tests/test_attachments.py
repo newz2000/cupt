@@ -1,6 +1,8 @@
 from unittest.mock import MagicMock, patch
 
 from cupt.attachments import attach_group
+from cupt.errors import EXIT_API, EXIT_NOT_FOUND
+from cupt.exceptions import APIError
 
 
 def _ctx(mock_config, mock_client, team_id="team1"):
@@ -128,7 +130,7 @@ def test_attach_get_no_match(runner, mock_config, mock_client):
             ],
         }
         result = runner.invoke(attach_group, ["get", "t1", "nonexistent"])
-        assert result.exit_code == 0
+        assert result.exit_code == EXIT_NOT_FOUND
         assert "No attachment matches" in result.output
 
 
@@ -163,7 +165,7 @@ def test_attach_add_error(runner, mock_config, mock_client, tmp_path):
         "cupt.attachments.get_client_context",
         return_value=_ctx(mock_config, mock_client),
     ):
-        mock_client.upload_task_attachment.side_effect = Exception("boom")
+        mock_client.upload_task_attachment.side_effect = APIError("HTTP 500: boom")
         result = runner.invoke(attach_group, ["add", "t1", str(upload_file)])
-        assert result.exit_code == 0
+        assert result.exit_code == EXIT_API
         assert "Failed to upload attachment" in result.output

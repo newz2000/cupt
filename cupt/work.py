@@ -6,6 +6,7 @@ from typing import Any, Dict, Iterable, List, Optional
 import click
 
 from cupt.context import get_client_context
+from cupt.errors import EXIT_INVALID_INPUT, fail
 from cupt.i18n import _, format_message
 from cupt.services.task_service import TaskService
 from cupt.services.time_service import TimeService
@@ -66,16 +67,21 @@ def work_tasks(
         return []
 
     service = TaskService(client)
-    tasks = service.list_tasks(
-        workspace_id=workspace_id,
-        user_id=config.get("user.user_id"),
-        today=today,
-        overdue=overdue,
-        week=week,
-        mine=mine,
-        tags=list(tags) if tags else None,
-        teams_filter=bool(teams),
-    )
+    try:
+        tasks = service.list_tasks(
+            workspace_id=workspace_id,
+            user_id=config.get("user.user_id"),
+            today=today,
+            overdue=overdue,
+            week=week,
+            mine=mine,
+            tags=list(tags) if tags else None,
+            teams_filter=bool(teams),
+        )
+    except Exception as e:
+        # Without this the APIError reached Click uncaught: a raw traceback
+        # and exit 1 where the contract promises a clean message and 5.
+        fail(format_message("Failed to list tasks: {error}", error=e), e)
     tasks = TaskService.filter_by_tags(tasks, required=list(tags) or None)
     tasks = TaskService.filter_by_teams(tasks, required=list(teams) or None)
     if limit:
@@ -86,10 +92,10 @@ def work_tasks(
         return tasks
 
     if not is_interactive():
-        print_error(
-            _("`cupt work` is interactive-only. Use `cupt work --json` for scripts.")
+        fail(
+            _("`cupt work` is interactive-only. Use `cupt work --json` for scripts."),
+            code=EXIT_INVALID_INPUT,
         )
-        return tasks
 
     if not tasks:
         print_warning(_("No tasks matched the work queue."))

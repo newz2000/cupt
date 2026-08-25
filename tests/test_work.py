@@ -3,6 +3,7 @@
 import json
 from unittest.mock import patch
 
+from cupt.errors import EXIT_INVALID_INPUT
 from cupt.work import work_cmd
 
 
@@ -34,7 +35,7 @@ def test_work_non_interactive_refuses_prompt(runner, mock_config, mock_client):
     ):
         result = runner.invoke(work_cmd, env={"CUPT_INTERACTIVE": "0"})
 
-    assert result.exit_code == 0
+    assert result.exit_code == EXIT_INVALID_INPUT
     assert "interactive-only" in result.output
 
 

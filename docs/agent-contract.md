@@ -21,6 +21,14 @@ JSON shapes for read commands.
 | 4 | Invalid user input or validation failure. |
 | 5 | ClickUp API or network failure. |
 
+Every code in this table is asserted by `tests/test_exit_codes.py`. Two notes:
+
+- Click emits its own exit code 2 for usage errors (unknown flag, missing
+  argument). It overlaps code 2 here; both mean "cannot proceed as asked", and
+  the stderr message distinguishes them.
+- A failure never writes to stdout, so `cupt list --json | jq` on a dead token
+  yields nothing *and* a non-zero status rather than silently empty success.
+
 ## Non-interactive mode
 
 Set `CUPT_INTERACTIVE=0` or pass `--no-interactive` to disable stateful UX:
@@ -69,6 +77,15 @@ preserves ClickUp objects unless noted.
   "completed_today": [],
   "time_entries": []
 }
+```
+
+### `cupt add --json`
+
+The created task, passed through from ClickUp unchanged. `id` and `name` are
+always present; everything else is whatever ClickUp returns for a new task.
+
+```json
+{"id": "task_id", "name": "Task name"}
 ```
 
 ### `cupt work --json`

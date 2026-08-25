@@ -6,13 +6,13 @@ from typing import Any, Dict, Optional
 import click
 
 from cupt.context import get_client_context
+from cupt.errors import fail
 from cupt.i18n import _, format_message
 from cupt.services.task_service import TaskService
 from cupt.utils import (
     format_date,
     format_duration,
     get_terminal_width,
-    print_error,
     truncate_text,
 )
 
@@ -104,8 +104,7 @@ def show_summary(mine: bool = True, as_json: bool = False) -> Optional[Dict[str,
             running_timer = fut_timer.result()
 
     except Exception as e:
-        print_error(format_message("Failed to fetch summary data: {error}", error=e))
-        return None
+        fail(format_message("Failed to fetch summary data: {error}", error=e), e)
 
     total_ms = sum(int(e.get("duration", 0)) for e in time_entries)
     payload: Dict[str, Any] = {

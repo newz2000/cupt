@@ -22,6 +22,16 @@ user impact are not listed.
   command help, common human-facing messages, and catalog drift checks.
 
 ### Fixed
+- **Agent contract:** commands now exit with the codes `docs/agent-contract.md`
+  documents. Only code 2 was ever raised; 3, 4, and 5 appeared nowhere in the
+  code, so a dead token, a missing task, and an empty result set were all
+  indistinguishable exit 0. `cupt work` and `cupt prefetch` additionally leaked
+  a raw Python traceback on API failure.
+- `cupt teams` warned and exited 0 when unauthenticated, where every sibling
+  command errors and exits 2. It now uses the shared authentication guard.
+- `ClickUpClient.get_running_timer` swallowed every exception and returned
+  `None`, so `cupt time status` reported "no timer running" on an expired
+  token. Only a 404 now means "nothing running".
 - Fixed `cupt time add <id> <duration> -m "<note>"` erroring after the entry was
   already created. The note confirmation passed `message=` to `format_message`,
   whose own first parameter is `message`, raising `TypeError`. The command

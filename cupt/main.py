@@ -14,6 +14,8 @@ from cupt.api import ClickUpClient
 from cupt.attachments import attach_group
 from cupt.auth import OAuthManager
 from cupt.config import ConfigManager
+from cupt.context import get_client_context
+from cupt.errors import EXIT_AUTH, fail
 from cupt.i18n import _, configure_language, format_message, translate_click_metadata
 from cupt.notes import add_note, list_notes
 from cupt.summary import summary_cmd
@@ -155,7 +157,7 @@ def auth():
                 )
 
         except Exception as e:
-            print_error(format_message("Failed to get user info: {error}", error=e))
+            fail(format_message("Failed to get user info: {error}", error=e), e)
 
     else:
         # OAuth method
@@ -212,7 +214,7 @@ def auth():
                     )
 
             except Exception as e:
-                print_error(format_message("Failed to get user info: {error}", error=e))
+                fail(format_message("Failed to get user info: {error}", error=e), e)
         else:
             print_error(_("Authentication failed"))
 
@@ -257,7 +259,7 @@ def status():
         )
 
     except Exception as e:
-        print_error(format_message("Failed to get status: {error}", error=e))
+        fail(format_message("Failed to get status: {error}", error=e), e)
 
 
 @cli.command()
@@ -271,24 +273,22 @@ def teams(workspace_id, as_json):
     """
     import json as _json
 
-    config = ConfigManager()
-    if not config.is_authenticated():
-        print_warning(_("Not authenticated. Run 'cupt auth' first."))
-        return
-
-    ws_id = workspace_id or config.get("user.workspace_id")
+    # --workspace-id may supply the workspace, so don't require a configured
+    # one up front — but go through the shared guard so an unauthenticated
+    # `cupt teams` exits 2 like every other command rather than warning and
+    # reporting success.
+    _config, client, default_workspace = get_client_context(need_workspace=False)
+    ws_id = workspace_id or default_workspace
     if not ws_id:
-        print_error(
-            _("Workspace ID not set. Run 'cupt config --workspace-id <id>' first.")
+        fail(
+            _("Workspace ID not set. Run 'cupt config --workspace-id <id>' first."),
+            code=EXIT_AUTH,
         )
-        return
 
     try:
-        client = ClickUpClient(config.get("auth.access_token"))
         team_list = client.get_teams(ws_id)
     except Exception as e:
-        print_error(format_message("Failed to fetch teams: {error}", error=e))
-        return
+        fail(format_message("Failed to fetch teams: {error}", error=e), e)
 
     if as_json:
         click.echo(_json.dumps(team_list, indent=2))

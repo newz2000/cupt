@@ -546,9 +546,6 @@ msgstr "No hay ningún temporizador en ejecución."
 msgid "No workspaces found - you may need to join one in ClickUp"
 msgstr "No se encontraron espacios de trabajo; quizá debas unirte a uno en ClickUp"
 
-msgid "Not authenticated. Run 'cupt auth' first."
-msgstr "No autenticado. Ejecuta 'cupt auth' primero."
-
 msgid "Not authenticated. Run 'cupt auth' to authenticate."
 msgstr "No autenticado. Ejecuta 'cupt auth' para autenticarte."
 

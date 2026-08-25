@@ -4,8 +4,9 @@ import click
 import requests
 
 from cupt.context import get_client_context
+from cupt.errors import EXIT_API, EXIT_FAILURE, EXIT_NOT_FOUND, fail
 from cupt.i18n import _, format_message
-from cupt.utils import print_error, print_success, print_warning
+from cupt.utils import print_success, print_warning
 
 
 def _human_size(n_bytes):
@@ -58,8 +59,7 @@ def list_attachments(task_id):
     try:
         task = client.get_task(task_id)
     except Exception as e:
-        print_error(format_message("Failed to fetch task: {error}", error=e))
-        return
+        fail(format_message("Failed to fetch task: {error}", error=e), e)
 
     attachments = task.get("attachments") or []
     if not attachments:
@@ -92,8 +92,7 @@ def get_attachment(task_id, selector, output):
     try:
         task = client.get_task(task_id)
     except Exception as e:
-        print_error(format_message("Failed to fetch task: {error}", error=e))
-        return
+        fail(format_message("Failed to fetch task: {error}", error=e), e)
 
     attachments = task.get("attachments") or []
     if not attachments:
@@ -102,15 +101,14 @@ def get_attachment(task_id, selector, output):
 
     target = _resolve(attachments, selector)
     if not target:
-        print_error(
-            format_message("No attachment matches '{selector}'.", selector=selector)
+        fail(
+            format_message("No attachment matches '{selector}'.", selector=selector),
+            code=EXIT_NOT_FOUND,
         )
-        return
 
     url = target.get("url")
     if not url:
-        print_error(_("Attachment has no download URL."))
-        return
+        fail(_("Attachment has no download URL."), code=EXIT_FAILURE)
 
     # No auth header — these are pre-signed S3 URLs; sending Authorization
     # can invalidate the signature.
@@ -118,8 +116,7 @@ def get_attachment(task_id, selector, output):
         response = requests.get(url, timeout=60, stream=True)
         response.raise_for_status()
     except requests.exceptions.RequestException as e:
-        print_error(format_message("Download failed: {error}", error=e))
-        return
+        fail(format_message("Download failed: {error}", error=e), code=EXIT_API)
 
     out_path = output or target.get("title") or "attachment.bin"
     try:
@@ -128,10 +125,12 @@ def get_attachment(task_id, selector, output):
                 if chunk:
                     fh.write(chunk)
     except OSError as e:
-        print_error(
-            format_message("Could not write to {path}: {error}", path=out_path, error=e)
+        fail(
+            format_message(
+                "Could not write to {path}: {error}", path=out_path, error=e
+            ),
+            code=EXIT_FAILURE,
         )
-        return
 
     print_success(
         format_message(
@@ -159,4 +158,4 @@ def add_attachment(task_id, file_path, name):
             )
         )
     except Exception as e:
-        print_error(format_message("Failed to upload attachment: {error}", error=e))
+        fail(format_message("Failed to upload attachment: {error}", error=e), e)

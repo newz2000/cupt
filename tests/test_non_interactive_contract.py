@@ -2,6 +2,7 @@
 
 from unittest.mock import patch
 
+from cupt.errors import EXIT_INVALID_INPUT
 from cupt.main import cli
 
 
@@ -20,7 +21,7 @@ def test_work_requires_json_or_interactive(runner, mock_config, mock_client):
         return_value=(mock_config, mock_client, "workspace1"),
     ):
         result = runner.invoke(cli, ["--no-interactive", "work"])
-    assert result.exit_code == 0
+    assert result.exit_code == EXIT_INVALID_INPUT
     assert "interactive-only" in result.output
 
 

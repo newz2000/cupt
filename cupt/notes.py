@@ -1,6 +1,7 @@
 import click
 
 from cupt.context import get_client_context
+from cupt.errors import fail
 from cupt.i18n import _, format_message
 from cupt.resolver import IDResolutionError, resolve_task_id
 from cupt.services.note_service import NoteService
@@ -36,8 +37,7 @@ def add_note(args):
     try:
         task_id = resolve_task_id(task_id_arg)
     except IDResolutionError as e:
-        print_error(str(e))
-        return
+        fail(str(e), e)
 
     _config, client, _workspace_id = get_client_context(need_workspace=False)
     if not client:
@@ -47,7 +47,7 @@ def add_note(args):
         NoteService(client).add_note(task_id, note_text)
         print_success(format_message("Note added to task {task_id}", task_id=task_id))
     except Exception as e:
-        print_error(format_message("Failed to add note: {error}", error=e))
+        fail(format_message("Failed to add note: {error}", error=e), e)
 
 
 @click.command(name="notes")
@@ -57,8 +57,7 @@ def list_notes(task_id):
     try:
         task_id = resolve_task_id(task_id)
     except IDResolutionError as e:
-        print_error(str(e))
-        return
+        fail(str(e), e)
 
     _config, client, _workspace_id = get_client_context(need_workspace=False)
     if not client:
@@ -86,4 +85,4 @@ def list_notes(task_id):
             click.echo("-" * 20)
 
     except Exception as e:
-        print_error(format_message("Failed to list notes: {error}", error=e))
+        fail(format_message("Failed to list notes: {error}", error=e), e)

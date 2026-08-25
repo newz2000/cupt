@@ -517,9 +517,6 @@ msgstr ""
 msgid "No workspaces found - you may need to join one in ClickUp"
 msgstr ""
 
-msgid "Not authenticated. Run 'cupt auth' first."
-msgstr ""
-
 msgid "Not authenticated. Run 'cupt auth' to authenticate."
 msgstr "Não autenticado. Execute 'cupt auth' para autenticar."
 

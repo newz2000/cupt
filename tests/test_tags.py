@@ -1,5 +1,7 @@
 from unittest.mock import patch
 
+from cupt.errors import EXIT_API
+from cupt.exceptions import APIError
 from cupt.tags import tag_group
 
 
@@ -31,9 +33,9 @@ def test_tag_add_api_error(runner, mock_config, mock_client):
     with patch(
         "cupt.tags.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.add_task_tag.side_effect = Exception("API Error")
+        mock_client.add_task_tag.side_effect = APIError("HTTP 500")
         result = runner.invoke(tag_group, ["add", "t1", "urgent"])
-        assert result.exit_code == 0
+        assert result.exit_code == EXIT_API
         assert "Failed to add tag" in result.output
 
 
@@ -41,7 +43,7 @@ def test_tag_remove_api_error(runner, mock_config, mock_client):
     with patch(
         "cupt.tags.get_client_context", return_value=_ctx(mock_config, mock_client)
     ):
-        mock_client.remove_task_tag.side_effect = Exception("API Error")
+        mock_client.remove_task_tag.side_effect = APIError("HTTP 500")
         result = runner.invoke(tag_group, ["remove", "t1", "urgent"])
-        assert result.exit_code == 0
+        assert result.exit_code == EXIT_API
         assert "Failed to remove tag" in result.output

@@ -3,6 +3,7 @@ from datetime import datetime
 import click
 
 from cupt.context import get_client_context
+from cupt.errors import EXIT_INVALID_INPUT, fail
 from cupt.i18n import _, format_message
 from cupt.resolver import IDResolutionError, resolve_task_id
 from cupt.services.time_service import TimeService
@@ -28,8 +29,7 @@ def start_timer(task_id):
     try:
         task_id = resolve_task_id(task_id)
     except IDResolutionError as e:
-        print_error(str(e))
-        return
+        fail(str(e), e)
 
     _config, client, workspace_id = get_client_context()
     if not client:
@@ -45,7 +45,7 @@ def start_timer(task_id):
             format_message("Started tracking time for task {task_id}", task_id=task_id)
         )
     except Exception as e:
-        print_error(format_message("Failed to start timer: {error}", error=e))
+        fail(format_message("Failed to start timer: {error}", error=e), e)
 
 
 @time_group.command("stop")
@@ -64,7 +64,7 @@ def stop_timer(task_id=None):
         service.stop_timer()
         print_success(_("Timer stopped"))
     except Exception as e:
-        print_error(format_message("Failed to stop timer: {error}", error=e))
+        fail(format_message("Failed to stop timer: {error}", error=e), e)
 
 
 @time_group.command("status")
@@ -92,7 +92,7 @@ def timer_status():
             print_warning(_("No timer is currently running"))
 
     except Exception as e:
-        print_error(format_message("Failed to get timer status: {error}", error=e))
+        fail(format_message("Failed to get timer status: {error}", error=e), e)
 
 
 @time_group.command("add")
@@ -118,8 +118,7 @@ def add_time(args, message):
     try:
         task_id = resolve_task_id(task_id_arg)
     except IDResolutionError as e:
-        print_error(str(e))
-        return
+        fail(str(e), e)
 
     _config, client, workspace_id = get_client_context()
     if not client:
@@ -127,10 +126,10 @@ def add_time(args, message):
 
     duration_ms = parse_duration(duration)
     if duration_ms is None:
-        print_error(
-            format_message("Invalid duration format: {duration}", duration=duration)
+        fail(
+            format_message("Invalid duration format: {duration}", duration=duration),
+            code=EXIT_INVALID_INPUT,
         )
-        return
 
     try:
         TimeService(client, workspace_id).add_manual_time(task_id, duration_ms, message)
@@ -146,4 +145,4 @@ def add_time(args, message):
             # a placeholder name raises TypeError.
             print_success(format_message("Note: {note}", note=message))
     except Exception as e:
-        print_error(format_message("Failed to add time entry: {error}", error=e))
+        fail(format_message("Failed to add time entry: {error}", error=e), e)
