@@ -11,6 +11,9 @@ user impact are not listed.
 ## [Unreleased]
 
 ### Added
+- Added `CUPT_HOME`, which relocates the config, cache, and state directory
+  (default `~/.cupt`) so one install can hold several ClickUp accounts, each
+  with its own token, default workspace, caches, and active task.
 - Added sanitized ClickUp payload fixture tests and an opt-in live ClickUp E2E
   test for comment rendering, status resolution, and read command contracts.
 

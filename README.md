@@ -41,6 +41,28 @@ pip install -e .
 
 To make a local checkout available system-wide: `pipx install --force .`
 
+## Multiple ClickUp accounts
+
+Everything `cupt` persists — your token, default workspace, caches, and the active task — lives in one directory, `~/.cupt` by default. Point `CUPT_HOME` somewhere else and you get a fully separate account on the same install:
+
+```bash
+export CUPT_HOME=~/.cupt-profiles/work
+cupt auth        # authenticates this profile only
+```
+
+One install, three accounts, via shell functions:
+
+```bash
+# ~/.bashrc
+cupt_work()     { CUPT_HOME=~/.cupt-profiles/work     cupt "$@"; }
+cupt_client()   { CUPT_HOME=~/.cupt-profiles/client   cupt "$@"; }
+cupt_personal() { CUPT_HOME=~/.cupt-profiles/personal cupt "$@"; }
+```
+
+Run `cupt auth` once per profile (`cupt_work auth`, `cupt_client auth`, …). Nothing is shared between them: `cupt_work start 1` doesn't change what `cupt_personal active` reports, and each profile caches its own workspace.
+
+`cupt status` tells you which account you're pointed at. Directories are created on first write, so you don't need to `mkdir` them ahead of time.
+
 ## Tutorial
 
 This walkthrough takes about five minutes and ends with you running real queries against your ClickUp workspace.
@@ -230,6 +252,7 @@ You now know enough to be productive. The command reference below is a quicker r
 | `cupt attach list\|add\|get <id> [args]` | Attachment management |
 | `cupt prefetch` | Cache details for the current task set for offline use |
 | Global: `--interactive` / `--no-interactive`, `--lang`, `CUPT_INTERACTIVE=1\|0`, `CUPT_LANG` | Force interactive (short IDs + active task) or stateless mode. Default: enabled when stdout is a TTY. |
+| Global: `CUPT_HOME` | Directory holding config, caches, and state. Default `~/.cupt`. Set it per-shell to keep several ClickUp accounts apart — see [Multiple ClickUp accounts](#multiple-clickup-accounts). |
 
 ## Use as a Python library
 

@@ -13,13 +13,30 @@ import yaml
 logger = logging.getLogger(__name__)
 
 
+def cupt_home() -> Path:
+    """Return the directory holding config, caches, and interactive state.
+
+    Defaults to ``~/.cupt``. Setting ``CUPT_HOME`` points every one of those
+    files somewhere else, which is how a single install keeps several ClickUp
+    accounts apart — each home carries its own token, default workspace,
+    caches, and active task.
+
+    Resolved per call, not at import time, so a caller can set the variable
+    before constructing a manager. An empty value means "unset".
+    """
+    override = os.environ.get("CUPT_HOME")
+    if override:
+        return Path(override).expanduser()
+    return Path.home() / ".cupt"
+
+
 class ConfigManager:
     def __init__(self, config_path: Optional[Path] = None):
         if config_path:
             self.config_file = config_path
             self.config_dir = self.config_file.parent
         else:
-            self.config_dir = Path.home() / ".cupt"
+            self.config_dir = cupt_home()
             self.config_file = self.config_dir / "config.yaml"
 
         self.cache_file = self.config_dir / "parent_cache.json"

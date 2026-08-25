@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from cupt.config import ConfigManager
+from cupt.config import ConfigManager, cupt_home
 
 
 def test_config_lazy_initialization(tmp_path):
@@ -269,3 +269,70 @@ def test_clear_cache_is_safe_when_nothing_exists(tmp_path):
     """Calling clear_cache on a brand-new install must not crash."""
     manager = ConfigManager(tmp_path / "config.yaml")
     manager.clear_cache()  # should be a no-op, no exception
+
+
+# ---------------------------------------------------------------------------
+# CUPT_HOME — multi-account isolation
+# ---------------------------------------------------------------------------
+
+
+def test_cupt_home_defaults_to_dot_cupt(monkeypatch, tmp_path):
+    monkeypatch.delenv("CUPT_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert cupt_home() == Path.home() / ".cupt"
+
+
+def test_cupt_home_honors_env_var(monkeypatch, tmp_path):
+    monkeypatch.setenv("CUPT_HOME", str(tmp_path / "work"))
+    assert cupt_home() == tmp_path / "work"
+
+
+def test_cupt_home_expands_tilde(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("CUPT_HOME", "~/profiles/client")
+    assert cupt_home() == tmp_path / "profiles" / "client"
+
+
+def test_cupt_home_empty_value_falls_back_to_default(monkeypatch, tmp_path):
+    """`CUPT_HOME=` in the environment must not resolve to the cwd."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("CUPT_HOME", "")
+    assert cupt_home() == Path.home() / ".cupt"
+
+
+def test_config_manager_uses_cupt_home(monkeypatch, tmp_path):
+    """The no-argument constructor — what every CLI command uses — routes
+    config and caches through CUPT_HOME."""
+    monkeypatch.setenv("CUPT_HOME", str(tmp_path / "work"))
+    manager = ConfigManager()
+
+    assert manager.config_file == tmp_path / "work" / "config.yaml"
+    assert manager.cache_file == tmp_path / "work" / "parent_cache.json"
+    assert manager.task_cache_file == tmp_path / "work" / "tasks_cache.json"
+    assert manager.task_cache_dir == tmp_path / "work" / "task_cache"
+
+
+def test_cupt_home_is_read_per_instantiation(monkeypatch, tmp_path):
+    """Two accounts in one process (or one shell that re-exports the var)
+    must not share the value resolved by whichever manager was built first."""
+    monkeypatch.setenv("CUPT_HOME", str(tmp_path / "work"))
+    work = ConfigManager()
+    work.set("auth.access_token", "pk_work")
+
+    monkeypatch.setenv("CUPT_HOME", str(tmp_path / "personal"))
+    personal = ConfigManager()
+    personal.set("auth.access_token", "pk_personal")
+
+    assert work.get("auth.access_token") == "pk_work"
+    assert personal.get("auth.access_token") == "pk_personal"
+    assert ConfigManager().get("auth.access_token") == "pk_personal"
+
+
+def test_explicit_config_path_beats_cupt_home(monkeypatch, tmp_path):
+    """Library users passing an explicit path keep control of it."""
+    monkeypatch.setenv("CUPT_HOME", str(tmp_path / "work"))
+    explicit = tmp_path / "elsewhere" / "config.yaml"
+    manager = ConfigManager(explicit)
+
+    assert manager.config_file == explicit
+    assert manager.config_dir == explicit.parent
