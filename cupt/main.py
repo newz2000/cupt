@@ -164,9 +164,10 @@ def auth():
             + _("To authenticate with ClickUp, you'll need to create an OAuth app:")
         )
         click.echo(_("1. Go to: https://app.clickup.com/settings/apps"))
-        click.echo(_("2. Click 'Create new app'"))
-        click.echo(_("3. Set redirect URL to: http://localhost:4321"))
-        click.echo(_("4. Copy your Client ID and Client Secret"))
+        click.echo(_("2. Open the 'ClickUp API Settings' tab at the top"))
+        click.echo(_("3. Click 'Create an App'"))
+        click.echo(_("4. Set redirect URL to: http://localhost:4321"))
+        click.echo(_("5. Copy your Client ID and Client Secret"))
         click.echo()
 
         client_id = click.prompt(_("Enter your ClickUp Client ID"), type=str)

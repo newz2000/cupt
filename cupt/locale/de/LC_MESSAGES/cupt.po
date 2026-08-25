@@ -41,19 +41,22 @@ msgstr ""
 msgid "1. OAuth (recommended for teams)"
 msgstr ""
 
-msgid "2. Click 'Create new app'"
+msgid "2. Copy your Personal API Token (starts with 'pk_')"
 msgstr ""
 
-msgid "2. Copy your Personal API Token (starts with 'pk_')"
+msgid "2. Open the 'ClickUp API Settings' tab at the top"
 msgstr ""
 
 msgid "2. Personal API Token (simpler, individual use)"
 msgstr ""
 
-msgid "3. Set redirect URL to: http://localhost:4321"
+msgid "3. Click 'Create an App'"
 msgstr ""
 
-msgid "4. Copy your Client ID and Client Secret"
+msgid "4. Set redirect URL to: http://localhost:4321"
+msgstr ""
+
+msgid "5. Copy your Client ID and Client Secret"
 msgstr ""
 
 msgid "; hit page cap — pair with --tag for full coverage"

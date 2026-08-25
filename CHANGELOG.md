@@ -31,6 +31,9 @@ user impact are not listed.
   command help, common human-facing messages, and catalog drift checks.
 
 ### Fixed
+- Corrected the OAuth app setup steps printed by `cupt auth`: ClickUp moved app
+  creation behind a "ClickUp API Settings" tab, and the button is "Create an
+  App", so the old steps dead-ended at the settings page.
 - Fixed `cupt context`, `cupt notes`, and `cupt show --notes` rendering blank
   comments for ClickUp API payloads that carry note bodies in `comment_text`
   or rich `comment` segments.

@@ -41,20 +41,23 @@ msgstr "1. Ve a: https://app.clickup.com/settings/apps"
 msgid "1. OAuth (recommended for teams)"
 msgstr "1. OAuth (recomendado para equipos)"
 
-msgid "2. Click 'Create new app'"
-msgstr "2. Haz clic en 'Create new app'"
-
 msgid "2. Copy your Personal API Token (starts with 'pk_')"
 msgstr "2. Copia tu token personal de API (empieza con 'pk_')"
+
+msgid "2. Open the 'ClickUp API Settings' tab at the top"
+msgstr "2. Abre la pestaña 'ClickUp API Settings' en la parte superior"
 
 msgid "2. Personal API Token (simpler, individual use)"
 msgstr "2. Token personal de API (más simple, uso individual)"
 
-msgid "3. Set redirect URL to: http://localhost:4321"
-msgstr "3. Configura la URL de redirección como: http://localhost:4321"
+msgid "3. Click 'Create an App'"
+msgstr "3. Haz clic en 'Create an App'"
 
-msgid "4. Copy your Client ID and Client Secret"
-msgstr "4. Copia tu Client ID y Client Secret"
+msgid "4. Set redirect URL to: http://localhost:4321"
+msgstr "4. Establece la URL de redirección en: http://localhost:4321"
+
+msgid "5. Copy your Client ID and Client Secret"
+msgstr "5. Copia tu Client ID y Client Secret"
 
 msgid "; hit page cap — pair with --tag for full coverage"
 msgstr "; alcanzó el límite de páginas; combínalo con --tag para cobertura completa"
