@@ -18,6 +18,44 @@ def _task_name(task: Dict[str, Any]) -> str:
     return task.get("name") or task.get("id", _("Unknown task"))
 
 
+def _running_timer_task_id(entry: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Task a running time entry belongs to, or None if it can't be told.
+
+    ClickUp returns the task as a nested object on some time-entry payloads
+    and as a flat ``task_id`` on others — `cupt summary` reads the first form
+    and `cupt time status` the second — so accept either.
+    """
+    if not entry:
+        return None
+    task = entry.get("task") or {}
+    return task.get("id") or entry.get("task_id")
+
+
+def _switch_timer(timer: TimeService, task_id: str) -> None:
+    """Point the running timer at ``task_id``, rolling over any other one.
+
+    `get_running_timer` is workspace-scoped, so a timer left running on an
+    earlier task looks the same as a timer for this one. Skipping the start
+    in that case is what let the active pointer and the timer drift apart:
+    the user is told the active task changed while their minutes keep
+    landing on the task they moved off. Focus mode promises a single active
+    task with automatic timing, so stop the stray timer and say so.
+    """
+    running = timer.get_running_timer()
+    if running and _running_timer_task_id(running) == task_id:
+        return
+    if running:
+        previous = _running_timer_task_id(running) or "?"
+        timer.stop_timer()
+        print_warning(
+            format_message(
+                "Stopped the timer on {previous} — now timing this task",
+                previous=previous,
+            )
+        )
+    timer.start_timer(task_id)
+
+
 @click.command(name="work")
 @click.option("--tag", "tags", multiple=True, help="Only tasks with this tag")
 @click.option("--team", "teams", multiple=True, help="Only tasks assigned to this team")
@@ -140,8 +178,7 @@ def _run_focus_loop(client, workspace_id: str, tasks: List[Dict[str, Any]]) -> N
                         )
                     )
                 try:
-                    if not timer.get_running_timer():
-                        timer.start_timer(task_id)
+                    _switch_timer(timer, task_id)
                 except Exception as exc:
                     print_warning(
                         format_message("Could not start timer: {error}", error=exc)
@@ -163,7 +200,8 @@ def _run_focus_loop(client, workspace_id: str, tasks: List[Dict[str, Any]]) -> N
                     state.free_short_for(task_id)
                     state.clear_active(only_if_id=task_id)
                     try:
-                        if timer.get_running_timer():
+                        running = timer.get_running_timer()
+                        if running and _running_timer_task_id(running) == task_id:
                             timer.stop_timer()
                     except Exception as exc:
                         print_warning(

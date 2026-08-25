@@ -768,6 +768,9 @@ msgstr ""
 msgid "Stop current time tracking"
 msgstr ""
 
+msgid "Stopped the timer on {previous} — now timing this task"
+msgstr ""
+
 msgid "Stopped: {task_id} — {name}"
 msgstr ""
 
