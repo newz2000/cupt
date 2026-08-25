@@ -622,6 +622,9 @@ msgstr ""
 msgid "Priority"
 msgstr ""
 
+msgid "Rejected a sign-in callback that did not match this session. Nothing was saved — run `cupt auth` again."
+msgstr ""
+
 msgid "Remove a tag from a task"
 msgstr ""
 

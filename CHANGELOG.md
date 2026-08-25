@@ -15,6 +15,12 @@ user impact are not listed.
   test for comment rendering, status resolution, and read command contracts.
 
 ### Changed
+- **Security:** `cupt auth`'s OAuth flow now sends an unguessable `state` value
+  and rejects any callback that doesn't carry it. The local callback server
+  previously accepted any request to `localhost:4321` bearing a `code`, so a
+  page visited during the 120-second sign-in window could bind the install to
+  an attacker's ClickUp account. A rejected callback aborts the flow
+  immediately instead of waiting out the timeout.
 - Documented local real-workspace performance verification and corrected
   `--all --team` timing guidance.
 - Marked the package as `1.0.0b2` for the second v1.0 beta.

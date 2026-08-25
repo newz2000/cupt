@@ -681,6 +681,9 @@ msgstr "Imprimir la cola de trabajo como JSON"
 msgid "Priority"
 msgstr "Prioridad"
 
+msgid "Rejected a sign-in callback that did not match this session. Nothing was saved — run `cupt auth` again."
+msgstr "Se ha rechazado una respuesta de inicio de sesión que no coincide con esta sesión. No se ha guardado nada: ejecuta `cupt auth` de nuevo."
+
 msgid "Remove a tag from a task"
 msgstr "Quitar una etiqueta de una tarea"
 

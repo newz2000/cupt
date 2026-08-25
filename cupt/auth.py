@@ -2,11 +2,12 @@
 OAuth authentication for ClickUp API v1 (updated)
 """
 
+import secrets
 import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Dict, Optional
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 import requests
 
@@ -40,6 +41,21 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
 
         # Check for authorization code
         if "code" in query_params:
+            # Anything can reach a listening localhost port, so a code alone
+            # proves nothing about who started this flow. Only accept a
+            # callback carrying the state we generated for this session.
+            if not self.auth_manager.verify_state(query_params.get("state", [None])[0]):
+                self.auth_manager.state_mismatch = True
+                self.send_response(400)
+                self.send_header("Content-type", "text/html")
+                self.end_headers()
+                self.wfile.write(
+                    b"<html><body><h1>Authentication Failed</h1>"
+                    b"<p>This callback did not match the pending sign-in. "
+                    b"Nothing was saved.</p></body></html>"
+                )
+                return
+
             code = query_params["code"][0]
 
             # Send response to browser
@@ -96,7 +112,15 @@ class OAuthManager:
         self.callback_port = 4321
         self.auth_code = None
         self.received = False
+        self.state = secrets.token_urlsafe(32)
+        self.state_mismatch = False
         self.config = ConfigManager()
+
+    def verify_state(self, received: Optional[str]) -> bool:
+        """Whether a callback's ``state`` belongs to this session."""
+        if not received:
+            return False
+        return secrets.compare_digest(received, self.state)
 
     def start_oauth_flow(self) -> Optional[Dict[str, Any]]:
         """Start OAuth authentication flow"""
@@ -104,7 +128,14 @@ class OAuthManager:
         redirect_uri = f"http://localhost:{self.callback_port}"
 
         # Use OAuth v2 authorize endpoint with proper encoding
-        auth_url = f"https://app.clickup.com/api?client_id={self.client_id}&redirect_uri={redirect_uri}"
+        query = urlencode(
+            {
+                "client_id": self.client_id,
+                "redirect_uri": redirect_uri,
+                "state": self.state,
+            }
+        )
+        auth_url = f"https://app.clickup.com/api?{query}"
 
         print_info(_("Opening browser for authentication..."))
         print_info(
@@ -139,12 +170,24 @@ class OAuthManager:
 
             # Start server in current thread (blocks until callback or timeout)
             start_time = time.time()
-            while not self.received and (time.time() - start_time) < 120:
+            while (
+                not self.received
+                and not self.state_mismatch
+                and (time.time() - start_time) < 120
+            ):
                 server.handle_request()
                 time.sleep(0.1)
 
             server.server_close()
 
+            if self.state_mismatch:
+                print_error(
+                    _(
+                        "Rejected a sign-in callback that did not match this session. "
+                        "Nothing was saved — run `cupt auth` again."
+                    )
+                )
+                return None
             if self.received and self.auth_code:
                 return self._exchange_code_for_tokens(self.auth_code)
             else:
