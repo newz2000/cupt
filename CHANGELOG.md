@@ -25,6 +25,11 @@ user impact are not listed.
   command help, common human-facing messages, and catalog drift checks.
 
 ### Fixed
+- `ConfigManager` no longer caches file contents for the lifetime of the
+  instance. Two managers open on one config would each save a snapshot taken
+  before the other's write, silently erasing it; the cache is now invalidated
+  when the file changes on disk, and `set()` re-reads first since it rewrites
+  the whole file.
 - Fixed the test suite writing to the developer's real `~/.cupt`. Any test that
   exercised a CLI command persisted an active task and short IDs to the home
   directory of whoever ran `pytest`; tests now run against a per-test

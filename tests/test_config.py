@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -336,3 +337,73 @@ def test_explicit_config_path_beats_cupt_home(monkeypatch, tmp_path):
 
     assert manager.config_file == explicit
     assert manager.config_dir == explicit.parent
+
+
+# ---------------------------------------------------------------------------
+# stale-cache safety
+#
+# The cache used to live for the lifetime of the instance, so two managers on
+# one file would erase each other's writes. That is how `cupt auth` lost its
+# OAuth token on every sign-in.
+# ---------------------------------------------------------------------------
+
+
+def test_two_managers_do_not_erase_each_others_writes(tmp_path):
+    config_file = tmp_path / "config.yaml"
+    writer, caller = ConfigManager(config_file), ConfigManager(config_file)
+
+    caller.get("auth.access_token")  # caller caches an empty config
+    writer.set("auth.access_token", "pk_TOKEN")
+    caller.set("user.workspace_id", "ws1")
+
+    on_disk = ConfigManager(config_file)
+    assert on_disk.get("auth.access_token") == "pk_TOKEN"
+    assert on_disk.get("user.workspace_id") == "ws1"
+
+
+def test_interleaved_writes_survive_one_timestamp_tick(tmp_path):
+    """Filesystem mtime granularity is too coarse to be the only guard."""
+    config_file = tmp_path / "config.yaml"
+    a, b = ConfigManager(config_file), ConfigManager(config_file)
+    b.get("anything")
+
+    for i in range(25):
+        a.set(f"a.k{i}", i)
+        b.set(f"b.k{i}", i)
+
+    final = ConfigManager(config_file).load_config()
+    assert len(final["a"]) == 25
+    assert len(final["b"]) == 25
+
+
+def test_reads_pick_up_another_managers_write(tmp_path):
+    config_file = tmp_path / "config.yaml"
+    reader, writer = ConfigManager(config_file), ConfigManager(config_file)
+
+    assert reader.get("auth.access_token") is None
+    writer.set("auth.access_token", "pk_NEW")
+    assert reader.get("auth.access_token") == "pk_NEW"
+
+
+def test_clearing_a_value_is_not_resurrected_by_a_stale_cache(tmp_path):
+    """`cupt logout` must stick even with another manager holding the token."""
+    config_file = tmp_path / "config.yaml"
+    a, b = ConfigManager(config_file), ConfigManager(config_file)
+    a.set("auth.access_token", "pk_TOKEN")
+    b.get("auth.access_token")  # b caches the token
+
+    a.set("auth.access_token", None)
+
+    assert ConfigManager(config_file).get("auth.access_token") is None
+    assert b.get("auth.access_token") is None
+
+
+def test_unchanged_file_is_not_reread(tmp_path):
+    """The cache still does its job when nothing has changed."""
+    config_file = tmp_path / "config.yaml"
+    manager = ConfigManager(config_file)
+    manager.set("user.workspace_id", "ws1")
+    manager.get("user.workspace_id")
+
+    with patch("builtins.open", side_effect=AssertionError("re-read the file")):
+        assert manager.get("user.workspace_id") == "ws1"
