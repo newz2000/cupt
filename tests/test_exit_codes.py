@@ -200,3 +200,19 @@ def test_success_exits_0(runner, mock_config, mock_client):
         result = runner.invoke(cli, ["--no-interactive", "list", "--json"])
 
     assert result.exit_code == EXIT_OK
+
+
+def test_nested_fail_keeps_the_inner_exit_code(runner, mock_config, mock_client):
+    """`click.exceptions.Exit` subclasses Exception, so a fail() raised inside a
+    command's own `except Exception` block used to be recoded as generic 1."""
+    mock_client.get_task.return_value = None
+    with patch(
+        "cupt.tasks.get_client_context",
+        return_value=(mock_config, mock_client, "workspace1"),
+    ):
+        result = runner.invoke(cli, ["--no-interactive", "context", "nope"])
+
+    assert result.exit_code == EXIT_NOT_FOUND
+    assert "not found" in result.output
+    # The generic wrapper message must not bury the specific one.
+    assert "Failed to fetch context" not in result.output

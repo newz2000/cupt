@@ -547,6 +547,12 @@ msgstr ""
 msgid "Opening browser for authentication..."
 msgstr ""
 
+msgid "Output context as JSON"
+msgstr ""
+
+msgid "Output notes as JSON"
+msgstr ""
+
 msgid "Output raw status data as JSON, plus the resolved target."
 msgstr ""
 

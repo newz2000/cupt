@@ -1,3 +1,4 @@
+import json
 from unittest.mock import patch
 
 from click.testing import CliRunner
@@ -51,3 +52,32 @@ def test_notes_auth_error():
         mock_cm.return_value.is_authenticated.return_value = False
         result = runner.invoke(add_note, ["abc", "note"])
         assert "Not authenticated" in result.output
+
+
+def test_notes_json_emits_an_array(runner, mock_config, mock_client):
+    mock_client.get_task_comments.return_value = [
+        {"id": "c1", "comment_text": "hello", "date": "1700000000000"}
+    ]
+    with patch(
+        "cupt.notes.get_client_context",
+        return_value=(mock_config, mock_client, "workspace1"),
+    ):
+        result = runner.invoke(list_notes, ["868abc", "--json"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["task_id"] == "868abc"
+    assert payload["notes"][0]["comment_text"] == "hello"
+
+
+def test_notes_json_is_empty_array_not_a_warning(runner, mock_config, mock_client):
+    """Scripts branch on the array; an empty result is success, not a warning."""
+    mock_client.get_task_comments.return_value = []
+    with patch(
+        "cupt.notes.get_client_context",
+        return_value=(mock_config, mock_client, "workspace1"),
+    ):
+        result = runner.invoke(list_notes, ["868abc", "--json"])
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout)["notes"] == []

@@ -28,6 +28,8 @@ EXIT_API = 5
 
 def exit_code_for(exc: Optional[BaseException]) -> int:
     """Map an exception to its documented exit code."""
+    if isinstance(exc, click.exceptions.Exit):
+        return exc.exit_code
     if isinstance(exc, (AuthError, ConfigError)):
         return EXIT_AUTH
     if isinstance(exc, IDResolutionError):
@@ -52,5 +54,12 @@ def fail(
     outright (for refusals that aren't exceptions, such as a command that needs
     a prompt in a non-interactive session).
     """
+    # click.exceptions.Exit subclasses Exception, so a fail() raised inside a
+    # command's own `except Exception` block arrives back here wrapped as `exc`.
+    # Re-raise it untouched: the inner call already chose the right code and
+    # printed the specific message, and the outer one would bury both.
+    if isinstance(exc, click.exceptions.Exit):
+        raise exc
+
     print_error(message)
     raise click.exceptions.Exit(code if code is not None else exit_code_for(exc))

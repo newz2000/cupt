@@ -11,6 +11,10 @@ user impact are not listed.
 ## [Unreleased]
 
 ### Added
+- Added `--json` to `cupt context` and `cupt notes`, the two read commands an
+  agent would plausibly script. `active`, `tags`, and `time status` remain
+  human-only by design, and the README no longer claims every read command has
+  it.
 - Added sanitized ClickUp payload fixture tests and an opt-in live ClickUp E2E
   test for comment rendering, status resolution, and read command contracts.
 

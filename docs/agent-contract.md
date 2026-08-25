@@ -35,6 +35,10 @@ Set `CUPT_INTERACTIVE=0` or pass `--no-interactive` to disable stateful UX:
 short-ID resolution, active-task fallback, and prompts. Commands that require a
 prompt fail cleanly instead of blocking.
 
+`active`, `tags`, and `time status` have no `--json`: they report interactive
+session state rather than ClickUp data. `cupt active` exits 0 and prints nothing
+in a non-interactive session, so it is safe as a probe.
+
 ## JSON schemas
 
 Schemas below are intentionally permissive for ClickUp-owned task fields: cupt
@@ -51,6 +55,22 @@ preserves ClickUp objects unless noted.
 ```json
 {"task": {}, "parent": null, "comments": []}
 ```
+
+### `cupt context --json`
+
+```json
+{"task": {}, "notes": [], "parent_task": null, "siblings": [], "is_subtask": false}
+```
+
+`siblings` excludes completed tasks unless `--show-completed` is passed.
+
+### `cupt notes --json`
+
+```json
+{"task_id": "task_id", "notes": []}
+```
+
+An empty `notes` array is a successful result, not a warning.
 
 ### `cupt statuses --json`
 

@@ -1,3 +1,5 @@
+import json
+
 import click
 
 from cupt.context import get_client_context
@@ -52,7 +54,8 @@ def add_note(args):
 
 @click.command(name="notes")
 @click.argument("task_id", required=False)
-def list_notes(task_id):
+@click.option("--json", "as_json", is_flag=True, help="Output notes as JSON")
+def list_notes(task_id, as_json):
     """List all notes (comments) for a task. Falls back to the active task."""
     try:
         task_id = resolve_task_id(task_id)
@@ -65,6 +68,12 @@ def list_notes(task_id):
 
     try:
         comments = NoteService(client).list_notes(task_id)
+
+        if as_json:
+            # An empty list is a valid result, not a warning — scripts branch
+            # on the array, not on stderr.
+            click.echo(json.dumps({"task_id": task_id, "notes": comments}, indent=2))
+            return
 
         if not comments:
             print_warning(

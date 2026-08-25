@@ -1070,16 +1070,19 @@ def show_statuses(identifier: str, is_list: bool = False, as_json: bool = False)
 @click.command(name="context")
 @click.argument("task_id", required=False)
 @click.option("--show-completed", is_flag=True, help="Include completed subtasks")
-def context_cmd(task_id, show_completed):
+@click.option("--json", "as_json", is_flag=True, help="Output context as JSON")
+def context_cmd(task_id, show_completed, as_json):
     """Show task context (parent, siblings, subtasks). Falls back to active task."""
     try:
         task_id = resolve_task_id(task_id)
     except IDResolutionError as e:
         fail(str(e), e)
-    return show_context(task_id, show_completed)
+    return show_context(task_id, show_completed, as_json)
 
 
-def show_context(task_id: str, show_completed: bool = False):
+def show_context(
+    task_id: str, show_completed: bool = False, as_json: bool = False
+) -> None:
     """Display a task's parent, notes, and siblings/subtasks."""
     _config, client, workspace_id = get_client_context()
     if not client:
@@ -1089,7 +1092,13 @@ def show_context(task_id: str, show_completed: bool = False):
         service = TaskService(client)
         ctx = service.get_task_context(task_id, workspace_id, show_completed)
         if not ctx:
-            print_error(format_message("Task {task_id} not found", task_id=task_id))
+            fail(
+                format_message("Task {task_id} not found", task_id=task_id),
+                code=EXIT_NOT_FOUND,
+            )
+
+        if as_json:
+            click.echo(json.dumps(ctx, indent=2))
             return
 
         task = ctx["task"]

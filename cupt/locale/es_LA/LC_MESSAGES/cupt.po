@@ -548,6 +548,12 @@ msgstr "Solo tareas con esta etiqueta (repetible; las tareas deben tener TODAS l
 msgid "Opening browser for authentication..."
 msgstr "Abriendo el navegador para autenticar..."
 
+msgid "Output context as JSON"
+msgstr "Mostrar el contexto en JSON"
+
+msgid "Output notes as JSON"
+msgstr "Mostrar las notas en JSON"
+
 msgid "Output raw status data as JSON, plus the resolved target."
 msgstr "Emitir datos de estado sin procesar como JSON, más el destino resuelto."
 
