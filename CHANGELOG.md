@@ -22,6 +22,10 @@ user impact are not listed.
   command help, common human-facing messages, and catalog drift checks.
 
 ### Fixed
+- Fixed `cupt time add <id> <duration> -m "<note>"` erroring after the entry was
+  already created. The note confirmation passed `message=` to `format_message`,
+  whose own first parameter is `message`, raising `TypeError`. The command
+  exited 0 despite printing an error, so the failure went unnoticed.
 - Fixed `cupt context`, `cupt notes`, and `cupt show --notes` rendering blank
   comments for ClickUp API payloads that carry note bodies in `comment_text`
   or rich `comment` segments.

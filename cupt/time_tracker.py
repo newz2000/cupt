@@ -142,6 +142,8 @@ def add_time(args, message):
             )
         )
         if message:
-            print_success(format_message("Note: {message}", message=message))
+            # `message` is format_message's own first parameter — passing it as
+            # a placeholder name raises TypeError.
+            print_success(format_message("Note: {note}", note=message))
     except Exception as e:
         print_error(format_message("Failed to add time entry: {error}", error=e))

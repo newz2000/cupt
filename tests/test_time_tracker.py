@@ -119,6 +119,9 @@ def test_time_add_success(runner, mock_config, mock_client):
         result = runner.invoke(time_group, ["add", "task1", "1h", "-m", "work"])
         assert result.exit_code == 0
         assert "Added 1h to task task1" in result.output
+        # Regression: the note confirmation used `message` as a placeholder
+        # name, colliding with format_message's own first parameter.
+        assert "Note: work" in result.output
         mock_client.add_time_entry.assert_called_once()
 
 

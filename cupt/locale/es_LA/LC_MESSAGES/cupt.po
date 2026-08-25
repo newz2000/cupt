@@ -500,8 +500,8 @@ msgstr "No establecido"
 msgid "Note added to task {task_id}"
 msgstr "Nota agregada a la tarea {task_id}"
 
-msgid "Note: {message}"
-msgstr "Nota: {message}"
+msgid "Note: {note}"
+msgstr "Nota: {note}"
 
 msgid "Notes"
 msgstr "Notas"

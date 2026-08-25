@@ -499,7 +499,7 @@ msgstr ""
 msgid "Note added to task {task_id}"
 msgstr ""
 
-msgid "Note: {message}"
+msgid "Note: {note}"
 msgstr ""
 
 msgid "Notes"
