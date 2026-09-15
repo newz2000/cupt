@@ -69,6 +69,7 @@ class TaskService:
         teams_filter: bool = False,
         statuses: Optional[List[str]] = None,
         deep_scan: bool = False,
+        custom_item_ids: Optional[List[int]] = None,
     ) -> List[Dict[str, Any]]:
         """Fetch and filter tasks from the API with pagination.
 
@@ -77,6 +78,14 @@ class TaskService:
                 `statuses[]` filter (OR semantics). Unlike tags or teams,
                 ClickUp's team task endpoint supports this natively, so it
                 is never applied client-side.
+            custom_item_ids: Task type ids (a task's `custom_item_id`) to
+                push to ClickUp's server-side `custom_items[]` filter (OR
+                semantics). Like `statuses`, this is supported natively by
+                the team task endpoint, so it does not need `deep_scan` —
+                there is no pagination-starvation hazard the way there is
+                for tags/teams/fields. `0` (the default task type) is a
+                legitimate value, so this is checked with `is not None`,
+                not truthiness.
             teams_filter: The original special case of `deep_scan`, kept
                 for backward compatibility with existing callers: when
                 True, the caller intends to apply a client-side team
@@ -109,6 +118,13 @@ class TaskService:
         # narrowing is needed here.
         if statuses:
             filters["statuses[]"] = list(statuses)
+
+        # custom_items[] IS supported server-side by ClickUp's team task
+        # endpoint (OR semantics, confirmed against the live API for id 0
+        # too), so — like statuses — no client-side narrowing or deep_scan
+        # is needed here. `0` is a real type id, hence `is not None`.
+        if custom_item_ids is not None:
+            filters["custom_items[]"] = list(custom_item_ids)
 
         # `deep` collapses the original teams-only flag and the general
         # `deep_scan` flag into one condition driving the pagination logic

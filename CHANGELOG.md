@@ -31,7 +31,16 @@ user impact are not listed.
   `teams_filter` flag: it suppresses the 100-task pagination early-exit so a
   client-side filter cannot be silently starved. Both are keyword arguments with
   defaults, so existing callers are unaffected.
-- `FieldService` and `DependencyService` are exported from `cupt`.
+- `cupt types` lists the workspace's task types, and `cupt list --type NAME`
+  filters on them (repeatable, OR semantics, case-insensitive). `cupt show`
+  reports a task's type, staying quiet for ordinary tasks so the line only
+  appears when it says something. Types are addressed by name throughout; the
+  `custom_item_id` integers stay an implementation detail. `--type` is pushed
+  to ClickUp's server-side `custom_items[]` filter, so unlike `--field` and
+  `--list` it needs no deeper pagination walk. An unknown type name exits 4
+  listing the valid ones rather than returning an empty result that reads as
+  "nothing matched".
+- `FieldService`, `DependencyService` and `TypeService` are exported from `cupt`.
   `cupt.services.field_service.display_value` is the single implementation of a
   custom field's human-readable value, shared by `cupt field list` and the
   `--field` / `--sort` filters so display and filtering cannot disagree. A value

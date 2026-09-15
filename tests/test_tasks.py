@@ -1155,6 +1155,135 @@ def test_list_tasks_offline_honors_field_sort_list_status(
         assert [t["id"] for t in data] == ["t_small", "t_big"]
 
 
+def test_list_tasks_offline_type_filter_resolves_and_matches(
+    runner, mock_config, mock_client
+):
+    """--offline --type still resolves names via the (network) type list
+    and then filters client-side against the cached custom_item_id."""
+    mock_config.load_task_cache.return_value = {
+        "tasks": [
+            {"id": "t_person", "name": "A Person", "custom_item_id": 3},
+            {"id": "t_other", "name": "Other", "custom_item_id": 5},
+        ],
+        "timestamp": time.time(),
+    }
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_custom_item_types.return_value = [
+            {"id": 3, "name": "Person", "description": None},
+            {"id": 5, "name": "Corp Matter", "description": None},
+        ]
+        result = runner.invoke(
+            list_tasks_cmd, ["--offline", "--type", "Person", "--json"]
+        )
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert [t["id"] for t in data] == ["t_person"]
+
+
+def test_list_tasks_offline_type_filter_fails_cleanly_without_network(
+    runner, mock_config, mock_client
+):
+    """--offline --type cannot silently ignore the flag when there is no
+    network to resolve the type name — it must fail with exit 4."""
+    mock_config.load_task_cache.return_value = {
+        "tasks": [{"id": "t1", "name": "A Person", "custom_item_id": 3}],
+        "timestamp": time.time(),
+    }
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_custom_item_types.side_effect = Exception("no network")
+        result = runner.invoke(list_tasks_cmd, ["--offline", "--type", "Person"])
+        assert result.exit_code == 4
+        assert "network" in result.output.lower()
+
+
+# ---------------------------------------------------------------------------
+# --type
+# ---------------------------------------------------------------------------
+
+
+def test_list_tasks_type_filter_resolves_and_queries_server_side(
+    runner, mock_config, mock_client
+):
+    """--type resolves the name via TypeService and pushes the id to the
+    server-side custom_items[] filter."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_custom_item_types.return_value = [
+            {"id": 3, "name": "Person", "description": None}
+        ]
+        mock_client.get_workspace_tasks.return_value = [
+            {
+                "id": "t1",
+                "name": "A Person",
+                "status": {"status": "open", "type": "open"},
+                "custom_item_id": 3,
+            }
+        ]
+        result = runner.invoke(list_tasks_cmd, ["--type", "Person"])
+        assert result.exit_code == 0
+        assert "A Person" in result.output
+        filters = mock_client.get_workspace_tasks.call_args[0][1]
+        assert filters["custom_items[]"] == [3]
+
+
+def test_list_tasks_type_filter_unknown_name_exits_4(runner, mock_config, mock_client):
+    """An unknown --type name is a usage error (exit 4) naming the valid
+    types, not a silent empty result."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_custom_item_types.return_value = [
+            {"id": 3, "name": "Person", "description": None}
+        ]
+        result = runner.invoke(list_tasks_cmd, ["--type", "Bogus"])
+        assert result.exit_code == 4
+        assert "Bogus" in result.output
+        assert "Person" in result.output
+        assert "Task" in result.output
+        mock_client.get_workspace_tasks.assert_not_called()
+
+
+def test_list_tasks_type_filter_multiple_or_together(runner, mock_config, mock_client):
+    """Repeated --type flags OR together into one custom_items[] filter."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_custom_item_types.return_value = [
+            {"id": 3, "name": "Person", "description": None},
+            {"id": 5, "name": "Corp Matter", "description": None},
+        ]
+        mock_client.get_workspace_tasks.return_value = []
+        runner.invoke(list_tasks_cmd, ["--type", "Person", "--type", "Corp Matter"])
+        filters = mock_client.get_workspace_tasks.call_args[0][1]
+        assert filters["custom_items[]"] == [3, 5]
+
+
+def test_list_tasks_type_filter_does_not_set_deep_scan(
+    runner, mock_config, mock_client
+):
+    """custom_items[] is a server-side filter (verified against the live
+    API, id 0 included), so --type must not trigger deep_scan the way
+    --field/--list/--team do."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ), patch("cupt.tasks.TaskService") as svc_cls:
+        svc = svc_cls.return_value
+        svc.list_tasks.return_value = []
+        svc.last_pages_walked = 1
+        mock_client.get_custom_item_types.return_value = [
+            {"id": 3, "name": "Person", "description": None}
+        ]
+        runner.invoke(list_tasks_cmd, ["--type", "Person"])
+        _, kwargs = svc.list_tasks.call_args
+        assert kwargs["deep_scan"] is False
+        assert kwargs["custom_item_ids"] == [3]
+
+
 def test_show_task_json_output(runner, mock_config, mock_client):
     """show --json bundles task + parent + comments as JSON."""
     with patch(
@@ -1177,6 +1306,98 @@ def test_show_task_json_output(runner, mock_config, mock_client):
         assert payload["task"]["id"] == "t1"
         assert payload["parent"] is None
         assert payload["comments"][0]["text"] == "a note"
+
+
+def test_show_task_displays_type_for_non_default_task(runner, mock_config, mock_client):
+    """A task with a non-default custom_item_id shows its resolved type
+    name."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_task.return_value = {
+            "id": "t1",
+            "name": "A Milestone",
+            "status": {"status": "open"},
+            "space": {"id": "s1"},
+            "folder": {"name": "f1"},
+            "list": {"name": "l1"},
+            "custom_item_id": 1002,
+        }
+        mock_client.get_custom_item_types.return_value = [
+            {"id": 1002, "name": "Milestone", "description": None}
+        ]
+        result = runner.invoke(show_task_cmd, ["t1"])
+        assert result.exit_code == 0
+        assert "Milestone" in result.output
+
+
+def test_show_task_omits_type_for_ordinary_task(runner, mock_config, mock_client):
+    """An ordinary task (custom_item_id 0 or missing) never shows a Type
+    line, and never pays for the lookup."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_task.return_value = {
+            "id": "t1",
+            "name": "Ordinary Task",
+            "status": {"status": "open"},
+            "space": {"id": "s1"},
+            "folder": {"name": "f1"},
+            "list": {"name": "l1"},
+            "custom_item_id": 0,
+        }
+        result = runner.invoke(show_task_cmd, ["t1"])
+        assert result.exit_code == 0
+        assert "Type" not in result.output
+        mock_client.get_custom_item_types.assert_not_called()
+
+
+def test_show_task_json_includes_resolved_type_name(runner, mock_config, mock_client):
+    """show --json adds the resolved type name alongside the raw
+    custom_item_id, without replacing it."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_task.return_value = {
+            "id": "t1",
+            "name": "A Milestone",
+            "status": {"status": "open"},
+            "space": {"id": "s1"},
+            "folder": {"name": "f1"},
+            "list": {"name": "l1"},
+            "custom_item_id": 1002,
+        }
+        mock_client.get_custom_item_types.return_value = [
+            {"id": 1002, "name": "Milestone", "description": None}
+        ]
+        mock_client.get_task_comments.return_value = []
+        result = runner.invoke(show_task_cmd, ["t1", "--json"])
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["type_name"] == "Milestone"
+        assert payload["task"]["custom_item_id"] == 1002
+
+
+def test_show_task_type_lookup_failure_degrades_gracefully(
+    runner, mock_config, mock_client
+):
+    """If resolving the type name fails, show still succeeds without it."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_task.return_value = {
+            "id": "t1",
+            "name": "A Milestone",
+            "status": {"status": "open"},
+            "space": {"id": "s1"},
+            "folder": {"name": "f1"},
+            "list": {"name": "l1"},
+            "custom_item_id": 1002,
+        }
+        mock_client.get_custom_item_types.side_effect = Exception("network down")
+        result = runner.invoke(show_task_cmd, ["t1"])
+        assert result.exit_code == 0
+        assert "A Milestone" in result.output
 
 
 def test_show_task_notes_displays_clickup_comment_text(

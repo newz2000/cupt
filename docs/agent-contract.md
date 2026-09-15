@@ -63,21 +63,33 @@ Filters, all repeatable unless noted:
 | `--status NAME` | OR. Pushed to ClickUp's server-side `statuses[]`. |
 | `--list NAME` | OR, matched on the task's own `list.name`. |
 | `--field NAME=VALUE` | AND across distinct names. Compared case-insensitively against the field's human-readable value. |
+| `--type NAME` | OR. Pushed to ClickUp's server-side `custom_items[]`. Names come from `cupt types`; an unknown one exits 4 rather than matching nothing. |
+
+`--type` is the one filter `--offline` cannot serve from cache alone: type
+names have to be resolved to ids over the network. Without a connection it
+exits 4 saying so, rather than silently ignoring the flag.
 | `--sort NAME` | Not repeatable. Ascending by a numeric custom field; missing or non-numeric values sort last. Applied before `--limit`, so `--sort size -n 5` is the five smallest. |
 
 `--field` splits on the first `=` only, so a value may contain `=`. A `--field`
 argument with no `=` is a usage error and exits 4 rather than silently matching
 nothing.
 
-`--status` filters server-side; `--list` and `--field` are applied client-side
-after pagination. cupt therefore walks deeper through the result pages whenever
+`--status` and `--type` filter server-side; `--list` and `--field` are applied
+client-side after pagination. cupt therefore walks deeper through the result pages whenever
 one of those is active, so the 100-task page cap cannot silently hide matches.
 
 ### `cupt show --json`
 
 ```json
-{"task": {}, "parent": null, "comments": []}
+{"task": {}, "parent": null, "comments": [], "type_name": null}
 ```
+
+`type_name` is the resolved name of the task's type. It is `null` for an
+ordinary task, and also `null` when the lookup fails — resolving it costs an
+API call, so a task with no non-default type never pays for one and a failed
+lookup degrades rather than failing the command. The raw `custom_item_id`
+stays on the task object either way. `cupt show --offline` omits `type_name`
+entirely: the type list is not part of the offline cache.
 
 ### `cupt context --json`
 
@@ -154,6 +166,19 @@ field an automated caller branches on to skip a task whose blocker is unfinished
 Direction is derived structurally from each dependency record's `task_id` /
 `depends_on` pair, never from its `type` field, whose encoding ClickUp does not
 document.
+
+### `cupt types --json`
+
+The task types available to `cupt list --type`. ClickUp calls these "custom
+items" in its API and "task types" in its UI.
+
+```json
+[{"id": 0, "name": "Task", "description": "Default ClickUp task"}]
+```
+
+The default type (`id` 0, the `custom_item_id` most tasks carry) leads the
+list. ClickUp's own endpoint omits it, so cupt supplies it — without it the
+most common type in a workspace could be neither named nor filtered.
 
 ### `cupt teams --json`
 

@@ -262,6 +262,23 @@ class ClickUpClient:
             raise APIError(f"Upload failed: {e}")
 
     # ------------------------------------------------------------------
+    # Task types (ClickUp's REST name is "custom items")
+    # ------------------------------------------------------------------
+
+    def get_custom_item_types(self, workspace_id: str) -> List[Dict[str, Any]]:
+        """List the workspace's task types.
+
+        Note what this does *not* include: the default "Task" type, whose
+        `custom_item_id` is 0. ClickUp only returns the types someone defined,
+        so the most common type in any workspace is absent here and has to be
+        supplied by the caller — see
+        :class:`cupt.services.type_service.TypeService`.
+        """
+        return self._make_request("GET", f"/team/{workspace_id}/custom_item").get(
+            "custom_items", []
+        )
+
+    # ------------------------------------------------------------------
     # Teams (user-groups within a workspace; ClickUp's REST URL is /group)
     # ------------------------------------------------------------------
 

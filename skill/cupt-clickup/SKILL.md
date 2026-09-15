@@ -116,6 +116,27 @@ Prefer these over encoding state in tags. `--status` is server-side; `--list`
 and `--field` are client-side, and cupt walks extra result pages when they are
 active so the page cap cannot hide matches.
 
+## Task types
+
+Not every record in a workspace is work. A ClickUp workspace can define task
+types — Person, Matter, Subscription, milestone — and by default `cupt list`
+returns all of them mixed together.
+
+```bash
+cupt types                      # what types exist and what --type accepts
+cupt list --type Task           # ordinary tasks only, excluding Person/Matter/etc.
+cupt list --type milestone --type Task
+```
+
+Run `cupt types` before using `--type`; names are workspace-specific and mix
+conventions (`milestone` alongside `Corp Matter`). Matching is
+case-insensitive. An unknown name exits 4 and lists the valid types, so a zero
+exit with no results genuinely means no tasks matched. `--type` is
+server-side, so it costs nothing extra.
+
+`cupt show` reports the type only for non-default tasks; an ordinary task
+shows no type line.
+
 ## Custom fields
 
 ```bash

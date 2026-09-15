@@ -414,6 +414,36 @@ def test_list_tasks_deep_scan_false_keeps_early_exit(service, mock_client):
     assert len(tasks) == 100
 
 
+# ---------------------------------------------------------------------------
+# custom_items[] (task type filter)
+# ---------------------------------------------------------------------------
+
+
+def test_list_tasks_passes_custom_item_ids_to_api(service, mock_client):
+    """custom_item_ids= is forwarded as ClickUp's server-side custom_items[]
+    filter (OR semantics), like statuses — not client-side."""
+    mock_client.get_workspace_tasks.return_value = []
+    service.list_tasks("team1", custom_item_ids=[1002, 3])
+    filters = mock_client.get_workspace_tasks.call_args[0][1]
+    assert filters["custom_items[]"] == [1002, 3]
+
+
+def test_list_tasks_custom_item_ids_zero_is_not_dropped(service, mock_client):
+    """0 (the default task type) is a legitimate id and must survive an
+    `is not None` check, not a truthiness check."""
+    mock_client.get_workspace_tasks.return_value = []
+    service.list_tasks("team1", custom_item_ids=[0])
+    filters = mock_client.get_workspace_tasks.call_args[0][1]
+    assert filters["custom_items[]"] == [0]
+
+
+def test_list_tasks_omits_custom_item_ids_when_none(service, mock_client):
+    mock_client.get_workspace_tasks.return_value = []
+    service.list_tasks("team1")
+    filters = mock_client.get_workspace_tasks.call_args[0][1]
+    assert "custom_items[]" not in filters
+
+
 def test_resolve_parent_names(service, mock_client):
     tasks = [{"id": "s1", "parent": "p1"}]
     mock_client.get_tasks_by_ids.return_value = [{"id": "p1", "name": "Parent Name"}]

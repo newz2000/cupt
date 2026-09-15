@@ -23,6 +23,7 @@ from cupt.i18n import _, configure_language, format_message, translate_click_met
 from cupt.notes import add_note, list_notes
 from cupt.summary import summary_cmd
 from cupt.tags import tag_group
+from cupt.task_types import types_cmd
 from cupt.tasks import (
     complete_task_cmd,
     context_cmd,
@@ -436,6 +437,7 @@ cli.add_command(complete_task_cmd)
 cli.add_command(context_cmd)
 cli.add_command(prefetch_cmd)
 cli.add_command(statuses_cmd)
+cli.add_command(types_cmd)
 
 cli.add_command(time_group)
 cli.add_command(tag_group)

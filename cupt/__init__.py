@@ -23,6 +23,7 @@ from cupt.services.field_service import FieldService
 from cupt.services.note_service import NoteService
 from cupt.services.task_service import TaskService
 from cupt.services.time_service import TimeService
+from cupt.services.type_service import TypeService
 
 __version__ = "1.1.0"
 __author__ = "Matthew Nuzum"
@@ -35,6 +36,7 @@ __all__ = [
     "NoteService",
     "FieldService",
     "DependencyService",
+    "TypeService",
     "CuptError",
     "APIError",
     "AuthError",
