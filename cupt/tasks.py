@@ -6,7 +6,7 @@ from typing import Optional
 import click
 
 from cupt.context import get_client_context
-from cupt.errors import EXIT_AUTH, EXIT_NOT_FOUND, fail
+from cupt.errors import EXIT_AUTH, EXIT_INVALID_INPUT, EXIT_NOT_FOUND, fail
 from cupt.i18n import _, format_message
 from cupt.resolver import IDResolutionError, resolve_task_id
 from cupt.services.task_service import TaskService
@@ -221,6 +221,37 @@ def _print_active_footer(state: StateManager) -> None:
     ),
 )
 @click.option(
+    "--field",
+    "fields",
+    multiple=True,
+    metavar="NAME=VALUE",
+    help=(
+        "Only tasks where custom field NAME equals VALUE (repeatable; "
+        "AND semantics across distinct NAMEs)."
+    ),
+)
+@click.option(
+    "--sort",
+    "sort_field",
+    help="Sort results ascending by numeric custom field NAME (applied before --limit)",
+)
+@click.option(
+    "--status",
+    "statuses",
+    multiple=True,
+    help="Only tasks with this status name (repeatable; OR semantics)",
+)
+@click.option(
+    "--list",
+    "list_names",
+    multiple=True,
+    # Deliberately a name match on the task payload's own `list.name`, not a
+    # hierarchy walk: resolving a list name to an id would mean crawling
+    # spaces and folders on every query, and the task already carries its
+    # list's name — no extra round trip needed.
+    help="Only tasks in this list by name (repeatable; OR semantics)",
+)
+@click.option(
     "--json",
     "as_json",
     is_flag=True,
@@ -241,6 +272,10 @@ def list_tasks_cmd(
     tags=(),
     no_tags=(),
     teams=(),
+    fields=(),
+    sort_field=None,
+    statuses=(),
+    list_names=(),
     as_json=False,
 ):
     """List tasks with optional filters"""
@@ -260,6 +295,10 @@ def list_tasks_cmd(
         tags,
         no_tags,
         teams,
+        fields,
+        sort_field,
+        statuses,
+        list_names,
         as_json,
     )
 
@@ -269,6 +308,29 @@ def _filter_by_tags(tasks, tags, no_tags):
     return TaskService.filter_by_tags(
         tasks, required=list(tags) or None, excluded=list(no_tags) or None
     )
+
+
+def _parse_field_filters(fields):
+    """Parse repeated `--field NAME=VALUE` options into a dict, or None.
+
+    Splits on the first `=` only, so VALUE may itself contain `=`. A
+    `--field` with no `=` is a usage error, not a filter that silently
+    matches nothing, so it exits immediately with EXIT_INVALID_INPUT.
+    """
+    if not fields:
+        return None
+    parsed = {}
+    for raw in fields:
+        if "=" not in raw:
+            fail(
+                format_message(
+                    "Invalid --field {value!r}; expected NAME=VALUE.", value=raw
+                ),
+                code=EXIT_INVALID_INPUT,
+            )
+        name, _sep, value = raw.partition("=")
+        parsed[name] = value
+    return parsed
 
 
 def list_tasks(
@@ -285,9 +347,17 @@ def list_tasks(
     tags=(),
     no_tags=(),
     teams=(),
+    fields=(),
+    sort_field=None,
+    statuses=(),
+    list_names=(),
     as_json=False,
 ):
     """List and display tasks."""
+    # Usage-error validation happens before any I/O so a malformed --field
+    # fails fast in both online and offline mode.
+    field_filters = _parse_field_filters(fields)
+
     config, client, config_workspace_id = get_client_context(need_workspace=False)
     if not client:
         return []
@@ -304,11 +374,26 @@ def list_tasks(
     try:
         if offline:
             return _list_tasks_offline(
-                config, limit, verbose, hide_subtasks, tags, no_tags, teams, as_json
+                config,
+                limit,
+                verbose,
+                hide_subtasks,
+                tags,
+                no_tags,
+                teams,
+                field_filters,
+                sort_field,
+                statuses,
+                list_names,
+                as_json,
             )
 
         service = TaskService(client)
         team_filter_active = bool(teams)
+        # Any client-side filter (fields, list names, or teams) can't see
+        # past the 100-task pagination cap unless we tell list_tasks to
+        # keep walking — same reasoning as the original team-only case.
+        deep_scan_active = bool(field_filters) or bool(list_names) or bool(teams)
         list_start = time.perf_counter()
         tasks = service.list_tasks(
             workspace_id=active_workspace_id,
@@ -320,6 +405,8 @@ def list_tasks(
             mine=mine,
             tags=list(tags) if tags else None,
             teams_filter=team_filter_active,
+            statuses=list(statuses) if statuses else None,
+            deep_scan=deep_scan_active,
         )
         list_elapsed = time.perf_counter() - list_start
 
@@ -338,12 +425,21 @@ def list_tasks(
         if teams:
             tasks = TaskService.filter_by_teams(tasks, required=list(teams))
 
+        if list_names:
+            tasks = TaskService.filter_by_list_names(tasks, required=list(list_names))
+
+        if field_filters:
+            tasks = TaskService.filter_by_fields(tasks, required=field_filters)
+
         if not tasks:
             if as_json:
                 click.echo("[]")
             else:
                 print_warning(_("No tasks matched the filter."))
             return []
+
+        if sort_field:
+            tasks = TaskService.sort_by_field(tasks, sort_field)
 
         if limit:
             tasks = tasks[:limit]
@@ -465,6 +561,10 @@ def _list_tasks_offline(
     tags=(),
     no_tags=(),
     teams=(),
+    field_filters=None,
+    sort_field=None,
+    statuses=(),
+    list_names=(),
     as_json=False,
 ):
     """Display tasks from local cache without any API calls."""
@@ -508,15 +608,32 @@ def _list_tasks_offline(
     if hide_subtasks:
         tasks = [t for t in tasks if not t.get("parent")]
 
+    # --status has no server to push a filter to in offline mode, so it's
+    # matched client-side here against the cached status name.
+    if statuses:
+        wanted = {s.lower() for s in statuses}
+        tasks = [
+            t
+            for t in tasks
+            if (t.get("status") or {}).get("status", "").lower() in wanted
+        ]
+
     tasks = _filter_by_tags(tasks, tags, no_tags)
     if teams:
         tasks = TaskService.filter_by_teams(tasks, required=list(teams))
+    if list_names:
+        tasks = TaskService.filter_by_list_names(tasks, required=list(list_names))
+    if field_filters:
+        tasks = TaskService.filter_by_fields(tasks, required=field_filters)
     if not tasks:
         if as_json:
             click.echo("[]")
         else:
             print_warning(_("No tasks matched the filter."))
         return []
+
+    if sort_field:
+        tasks = TaskService.sort_by_field(tasks, sort_field)
 
     if limit:
         tasks = tasks[:limit]

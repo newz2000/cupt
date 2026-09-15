@@ -14,9 +14,11 @@ from cupt.add import add_cmd
 from cupt.api import ClickUpClient
 from cupt.attachments import attach_group
 from cupt.auth import OAuthManager
-from cupt.config import ConfigManager
-from cupt.context import get_client_context
+from cupt.config import ConfigManager, cupt_home
+from cupt.context import get_client_context, identity_label
+from cupt.dependencies import dep_group
 from cupt.errors import EXIT_AUTH, fail
+from cupt.fields import field_group
 from cupt.i18n import _, configure_language, format_message, translate_click_metadata
 from cupt.notes import add_note, list_notes
 from cupt.summary import summary_cmd
@@ -155,6 +157,7 @@ def auth(no_browser):
             if workspaces:
                 config.set("user.workspace_id", workspaces[0]["id"])
                 config.set("user.user_id", user_info["user"]["id"])
+                config.set("user.username", user_info["user"]["username"])
                 print_success(
                     format_message(
                         "Authenticated as {username}",
@@ -209,6 +212,7 @@ def auth(no_browser):
                     # Set first workspace as default
                     config.set("user.workspace_id", workspaces[0]["id"])
                     config.set("user.user_id", user_info["user"]["id"])
+                    config.set("user.username", user_info["user"]["username"])
 
                     print_success(
                         format_message(
@@ -242,16 +246,30 @@ def logout():
 
 
 @cli.command()
-def status():
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Output identity and profile as JSON (pipeable)",
+)
+def status(as_json):
     """Show authentication status and user info"""
+    import json as _json
+
     config = ConfigManager()
 
     if not config.is_authenticated():
-        print_warning(_("Not authenticated. Run 'cupt auth' to authenticate."))
-        return
+        # Not being signed in is a configuration failure, not a quiet success:
+        # a script that treats it as "no data" acts as nobody at all.
+        fail(
+            _("Not authenticated. Run 'cupt auth' to authenticate."),
+            code=EXIT_AUTH,
+        )
 
     try:
-        client = ClickUpClient(config.get("auth.access_token"))
+        client = ClickUpClient(
+            config.get("auth.access_token"), identity=identity_label(config)
+        )
         user_info = client.get_user()
         workspace_id = config.get("user.workspace_id")
 
@@ -261,6 +279,33 @@ def status():
             workspace_name = current_ws["name"] if current_ws else _("Unknown")
         else:
             workspace_name = _("Not set")
+
+        if as_json:
+            user = user_info.get("user", {})
+            click.echo(
+                _json.dumps(
+                    {
+                        # The id, not the name, is the identifier: a workspace
+                        # can hold several accounts for one human or bot, and
+                        # display names are neither unique nor stable.
+                        "user": {
+                            "id": user.get("id"),
+                            "username": user.get("username"),
+                            "email": user.get("email"),
+                        },
+                        "workspace": {
+                            "id": workspace_id,
+                            "name": workspace_name if workspace_id else None,
+                        },
+                        # The profile actually loaded, so a caller can confirm
+                        # which CUPT_HOME it is acting out of before writing.
+                        "config_home": str(cupt_home()),
+                        "version": __version__,
+                    },
+                    indent=2,
+                )
+            )
+            return
 
         print_success(
             format_message(
@@ -394,6 +439,8 @@ cli.add_command(statuses_cmd)
 
 cli.add_command(time_group)
 cli.add_command(tag_group)
+cli.add_command(field_group)
+cli.add_command(dep_group)
 cli.add_command(attach_group)
 
 cli.add_command(add_note)

@@ -18,11 +18,13 @@ not part of the public API and may change between releases.
 
 from cupt.api import ClickUpClient
 from cupt.exceptions import APIError, AuthError, ConfigError, CuptError
+from cupt.services.dependency_service import DependencyService
+from cupt.services.field_service import FieldService
 from cupt.services.note_service import NoteService
 from cupt.services.task_service import TaskService
 from cupt.services.time_service import TimeService
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __author__ = "Matthew Nuzum"
 __email__ = "matthew@nuzum.com"
 
@@ -31,6 +33,8 @@ __all__ = [
     "TaskService",
     "TimeService",
     "NoteService",
+    "FieldService",
+    "DependencyService",
     "CuptError",
     "APIError",
     "AuthError",

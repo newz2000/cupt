@@ -5,6 +5,8 @@ CUPT stands for "ClickUP Terminal," a command-line interface for accessing your 
 ## Features
 - **Task listing** with deep paging, date filters, and subtask nesting (`↳`).
 - **Tag and team filters** — `cupt list --tag ai_ready --team MattTech` scopes to exactly what you're working on.
+- **Custom fields** — read and write them by name with `cupt field list|set|clear`, and query on them: `cupt list --field "Repo=astro-site" --sort size`. You never handle a field uuid.
+- **Dependencies** — `cupt dep list <id>` reports what a task waits on and whether it's `blocked`, so automation can skip work whose blocker isn't done; `cupt dep add|rm` edits the links.
 - **Hierarchical context** — `cupt context <id>` shows a task's parent and siblings.
 - **Status-aware completion** — `cupt done` resolves the correct "closed" status per task's list automatically; `--dry-run` lets you preview before writing.
 - **Stateful interactive UX** — `cupt list` shows a stable `#` column (1, 2, 3…) you can type instead of long ClickUp IDs. `cupt start <id>` sets a session active task so subsequent commands (`note`, `done`, `show`, `time start`) don't need an ID. Both features auto-hide when stdout is a pipe, so scripts and agents keep their stateless behavior.
@@ -14,7 +16,7 @@ CUPT stands for "ClickUP Terminal," a command-line interface for accessing your 
 - **Attachments** — list, download, and upload files on tasks.
 - **Flexible auth** — OAuth or Personal API Token.
 - **Offline support** — `cupt list` transparently caches what it just showed; `cupt show <id> --offline` works without a network. `cupt prefetch` populates the cache eagerly.
-- **JSON for everything scriptable** — `list`, `show`, `context`, `notes`, `statuses`, `teams`, `summary`, `work`, and `add` all take `--json` for piping into `jq` or feeding an agent. The stateful helpers (`active`, `tags`, `time status`) stay human-only by design.
+- **JSON for everything scriptable** — `list`, `show`, `context`, `notes`, `statuses`, `teams`, `summary`, `work`, `add`, `status`, `field list`, and `dep list` all take `--json` for piping into `jq` or feeding an agent. The stateful helpers (`active`, `tags`, `time status`) stay human-only by design.
 - **Agent skill bundled** — `skill/cupt-clickup/` is a portable SKILL.md that teaches Claude Code, OpenCode, Codex, and other agents how to drive cupt efficiently. See [For AI agents](#for-ai-agents) below.
 
 ## Installation
@@ -254,10 +256,10 @@ You now know enough to be productive. The command reference below is a quicker r
 
 | Command | What it does |
 |---|---|
-| `cupt auth` / `cupt logout` / `cupt status` | Manage credentials and check current account/workspace |
+| `cupt auth` / `cupt logout` / `cupt status [--json]` | Manage credentials and check current account/workspace. `--json` reports the user **id**, workspace, `config_home`, and version for scripts. Exits 2 when signed out. |
 | `cupt config --workspace-id <id>` | Override the default workspace |
 | `cupt teams` | List ClickUp teams (user-groups) in the workspace |
-| `cupt list [--overdue\|--today\|--week] [--tag X] [--no-tag X] [--team X] [--mine\|--all] [--json] [--offline]` | List tasks with stackable filters. Interactive sessions get a `#` short-ID column. |
+| `cupt list [--overdue\|--today\|--week] [--tag X] [--no-tag X] [--team X] [--status X] [--list X] [--field N=V] [--sort N] [--mine\|--all] [--json] [--offline]` | List tasks with stackable filters. `--field` ANDs across distinct names; `--status` and `--list` OR. `--sort` orders by a numeric custom field before `--limit`. Interactive sessions get a `#` short-ID column. |
 | `cupt show [<id>] [--notes] [--json] [--offline]` | Full task details. Falls back to the active task when no ID is given. |
 | `cupt context [<id>] [--show-completed] [--json]` | Parent + sibling/subtask view. Falls back to active. |
 | `cupt statuses <id> [--list] [--json]` | Show available statuses for a task's list (or pass `--list <list-id>`) |
@@ -267,6 +269,8 @@ You now know enough to be productive. The command reference below is a quicker r
 | `cupt work [--tag X] [--team X] [--today\|--overdue\|--week] [--json]` | Sequential focus mode: work, skip, complete, or quit one task at a time. |
 | `cupt summary [--all] [--json]` | Daily due/overdue/completed/time summary. |
 | `cupt tag add\|remove <id> <name>` | Tag management |
+| `cupt field list <id> [--json]` / `cupt field set <id> "<name>" <value>` / `cupt field clear <id> "<name>"` | Custom fields, addressed by name. An unknown field or dropdown option exits 4 and lists the valid choices. |
+| `cupt dep list <id> [--json]` / `cupt dep add\|rm <id> --waiting-on <other>` | Dependencies. `dep list --json` includes `blocked` for automated work selection. |
 | `cupt time start [<id>]` / `cupt time stop` / `cupt time add [<id>] <dur>` / `cupt time status` | Time tracking. `start` and `add` fall back to the active task. |
 | `cupt note [<id>] "<text>"` / `cupt notes [<id>] [--json]` | Add or list comments; both fall back to the active task. |
 | `cupt attach list\|add\|get <id> [args]` | Attachment management |

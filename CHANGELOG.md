@@ -8,6 +8,49 @@ Entry style: each release lists user-visible changes grouped under
 (bug fixes), and **Removed** (deletions). Internal refactors with no
 user impact are not listed.
 
+## [1.1.0] — 2026-09-15
+
+### Added
+- `cupt field list|set|clear` — read and write ClickUp custom fields by name.
+  Fields and dropdown options are addressed by their human names; no caller ever
+  handles a field uuid. Setting an unknown dropdown option fails with the valid
+  options listed instead of writing nothing and reporting success.
+- `cupt list` gained `--field NAME=VALUE` (repeatable, AND semantics),
+  `--sort NAME` (ascending by a numeric custom field, applied before `--limit`),
+  `--status NAME` and `--list NAME` (both repeatable, OR semantics). Together
+  these cover the work-selection queries that were being approximated with tags.
+- `cupt dep list|add|rm` — read and edit task dependencies. `dep list --json`
+  reports `blocked`, so an automated caller can skip a task whose blocker is not
+  yet done.
+- `cupt status --json` — machine-readable identity: the user **id** as well as
+  the display name, the workspace, the `config_home` actually in use, and the
+  cupt version. Names are not reliable identifiers, and a caller needs to
+  confirm which `CUPT_HOME` profile it loaded before acting.
+- `TaskService.list_tasks` gained `statuses=` (pushed to ClickUp's server-side
+  `statuses[]` filter) and `deep_scan=`, the general form of the existing
+  `teams_filter` flag: it suppresses the 100-task pagination early-exit so a
+  client-side filter cannot be silently starved. Both are keyword arguments with
+  defaults, so existing callers are unaffected.
+- `FieldService` and `DependencyService` are exported from `cupt`.
+  `cupt.services.field_service.display_value` is the single implementation of a
+  custom field's human-readable value, shared by `cupt field list` and the
+  `--field` / `--sort` filters so display and filtering cannot disagree. A value
+  matching no current option reads as unset rather than exposing the id ClickUp
+  still stores.
+
+### Changed
+- API errors now carry ClickUp's own error code verbatim (e.g. `[FIELD_220]`)
+  alongside its prose. The codes are specific and are what a script should
+  branch on.
+- A 401 or 403 now names the authenticated identity that was refused. Permission
+  failures are identity-specific and a caller may be running as a service
+  account, so a bare "403" sends them auditing the wrong profile. cupt states who
+  was refused and never guesses which other account would have succeeded.
+- `cupt status` exits 2 when not authenticated, instead of warning and exiting 0.
+  Signed out is a failure, not an empty result: a script that read it as "no
+  data" would carry on acting as nobody at all. This matches the change already
+  made to `cupt teams` in 1.0.0.
+
 ## [1.0.0] — 2026-08-24
 
 ### Added

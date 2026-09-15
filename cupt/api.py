@@ -22,8 +22,14 @@ class ClickUpClient:
     BASE_URL = "https://api.clickup.com/api/v2"
     TIMEOUT = 10  # seconds — prevents the CLI from hanging on a slow/unresponsive API
 
-    def __init__(self, access_token: str):
+    def __init__(self, access_token: str, identity: Optional[str] = None):
         self.access_token = access_token
+        # Label for the authenticated account, used only to say *who* was
+        # refused on a 401/403. Permission failures are identity-specific and
+        # a caller may be running as a service account, so a bare "403" sends
+        # them hunting through the wrong profile. We state the identity that
+        # was refused and never guess which one would have succeeded.
+        self.identity = identity
         self.session = requests.Session()
         # Only Authorization on the session. Content-Type is set per-request
         # inside _make_request so it never leaks into multipart uploads
@@ -71,7 +77,7 @@ class ClickUpClient:
                     url, json=data, headers=json_headers, timeout=self.TIMEOUT
                 )
             elif method.upper() == "DELETE":
-                response = self.session.delete(url, timeout=self.TIMEOUT)
+                response = self.session.delete(url, params=params, timeout=self.TIMEOUT)
             else:
                 raise ValueError(f"Unsupported HTTP method: {method}")
 
@@ -84,8 +90,16 @@ class ClickUpClient:
                 try:
                     error_data = e.response.json()
                     error_msg += f": {error_data.get('err', '')}"
+                    # ClickUp's own code (FIELD_220, OAUTH_027, …) is far more
+                    # specific than its prose and is what a script should
+                    # branch on, so carry it through verbatim.
+                    ecode = error_data.get("ECODE")
+                    if ecode:
+                        error_msg += f" [{ecode}]"
                 except json.JSONDecodeError:
                     error_msg += f": {e.response.text[:200]}"
+            if e.response.status_code in (401, 403) and self.identity:
+                error_msg += f" (refused for {self.identity})"
             logger.debug("API error on %s %s: %s", method, endpoint, error_msg)
             raise APIError(error_msg)
         except requests.exceptions.Timeout:
@@ -170,6 +184,43 @@ class ClickUpClient:
             f"/task/{task_id}/dependency",
             data={"depends_on": depends_on},
         )
+
+    def remove_task_dependency(self, task_id: str, depends_on: str) -> Dict[str, Any]:
+        """Remove the link that makes ``task_id`` wait on ``depends_on``.
+
+        ClickUp takes the pair as query parameters on a DELETE, not as a body.
+        """
+        return self._make_request(
+            "DELETE",
+            f"/task/{task_id}/dependency",
+            params={"depends_on": depends_on},
+        )
+
+    # ------------------------------------------------------------------
+    # Custom fields
+    # ------------------------------------------------------------------
+
+    def set_task_custom_field(
+        self, task_id: str, field_id: str, value: Any
+    ) -> Dict[str, Any]:
+        """Write ``value`` to one custom field on a task.
+
+        The readable name -> field id (and, for a dropdown, option name ->
+        option uuid) translation belongs to
+        :class:`cupt.services.field_service.FieldService`; this method is the
+        HTTP call and nothing else.
+        """
+        return self._make_request(
+            "POST", f"/task/{task_id}/field/{field_id}", data={"value": value}
+        )
+
+    def remove_task_custom_field(self, task_id: str, field_id: str) -> Dict[str, Any]:
+        """Clear one custom field on a task."""
+        return self._make_request("DELETE", f"/task/{task_id}/field/{field_id}")
+
+    # ------------------------------------------------------------------
+    # Tags
+    # ------------------------------------------------------------------
 
     def add_task_tag(self, task_id: str, tag_name: str) -> Dict[str, Any]:
         return self._make_request("POST", f"/task/{task_id}/tag/{tag_name}")

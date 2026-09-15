@@ -396,6 +396,176 @@ def test_list_tasks_stacked_tags_or_then_and(runner, mock_config, mock_client):
         assert "Just B" not in result.output
 
 
+# ---------------------------------------------------------------------------
+# --field / --sort / --status / --list
+# ---------------------------------------------------------------------------
+
+
+def _blocked_by_options():
+    return [
+        {"id": "opt-nothing", "orderindex": 0, "name": "Nothing"},
+        {"id": "opt-design", "orderindex": 1, "name": "Design System"},
+    ]
+
+
+def _field_task(task_id, list_name, blocked_by_idx, repo, size):
+    return {
+        "id": task_id,
+        "name": task_id,
+        "status": {"status": "to do", "type": "open"},
+        "list": {"name": list_name},
+        "custom_fields": [
+            {
+                "name": "Blocked by",
+                "type": "drop_down",
+                "value": blocked_by_idx,
+                "type_config": {"options": _blocked_by_options()},
+            },
+            {"name": "Repo", "type": "text", "value": repo},
+            {"name": "size", "type": "number", "value": size},
+        ],
+    }
+
+
+def test_list_tasks_target_query_end_to_end(runner, mock_config, mock_client):
+    """The documented `--list --status --field --field --sort --json` query
+    filters and sorts correctly end to end."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_workspace_tasks.return_value = [
+            _field_task("t_big", "Website", 0, "astro-site", 5),
+            _field_task("t_small", "Website", 0, "astro-site", 2),
+            # Wrong "Blocked by" value.
+            _field_task("t_blocked", "Website", 1, "astro-site", 1),
+            # Wrong list.
+            _field_task("t_other_list", "Marketing", 0, "astro-site", 1),
+            # Wrong repo.
+            _field_task("t_other_repo", "Website", 0, "other-repo", 1),
+        ]
+        result = runner.invoke(
+            list_tasks_cmd,
+            [
+                "--list",
+                "Website",
+                "--status",
+                "to do",
+                "--field",
+                "Blocked by=Nothing",
+                "--field",
+                "Repo=astro-site",
+                "--sort",
+                "size",
+                "--json",
+            ],
+        )
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert [t["id"] for t in data] == ["t_small", "t_big"]
+
+        # --status reached the server-side statuses[] filter.
+        filters = mock_client.get_workspace_tasks.call_args[0][1]
+        assert filters["statuses[]"] == ["to do"]
+
+
+def test_list_tasks_field_without_equals_is_usage_error(
+    runner, mock_config, mock_client
+):
+    """A `--field` with no `=` is a usage error (exit 4), not a silent
+    no-match filter."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        result = runner.invoke(list_tasks_cmd, ["--field", "no-equals-sign"])
+        assert result.exit_code == 4
+        assert "NAME=VALUE" in result.output
+
+
+def test_list_tasks_field_value_may_contain_equals(runner, mock_config, mock_client):
+    """Splitting on the FIRST `=` only lets VALUE itself contain `=`."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_workspace_tasks.return_value = [
+            {
+                "id": "t1",
+                "name": "Task 1",
+                "status": {"status": "open", "type": "open"},
+                "custom_fields": [{"name": "Formula", "type": "text", "value": "a=b"}],
+            }
+        ]
+        result = runner.invoke(list_tasks_cmd, ["--field", "Formula=a=b", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert [t["id"] for t in data] == ["t1"]
+
+
+def test_list_tasks_sort_applies_before_limit(runner, mock_config, mock_client):
+    """--sort size -n 5 must give the five *smallest*, not the first five
+    fetched then sorted."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_workspace_tasks.return_value = [
+            {
+                "id": f"t{i}",
+                "name": f"Task {i}",
+                "status": {"status": "open", "type": "open"},
+                "custom_fields": [{"name": "size", "type": "number", "value": i}],
+            }
+            for i in reversed(range(10))  # fetched in descending size order
+        ]
+        result = runner.invoke(list_tasks_cmd, ["--sort", "size", "-n", "5", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert [t["id"] for t in data] == ["t0", "t1", "t2", "t3", "t4"]
+
+
+def test_list_tasks_filter_by_list_name(runner, mock_config, mock_client):
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        mock_client.get_workspace_tasks.return_value = [
+            {
+                "id": "t1",
+                "name": "Site Task",
+                "status": {"status": "open", "type": "open"},
+                "list": {"name": "Website"},
+            },
+            {
+                "id": "t2",
+                "name": "Marketing Task",
+                "status": {"status": "open", "type": "open"},
+                "list": {"name": "Marketing"},
+            },
+        ]
+        result = runner.invoke(list_tasks_cmd, ["--list", "website"])
+        assert result.exit_code == 0
+        assert "Site Task" in result.output
+        assert "Marketing Task" not in result.output
+
+
+def test_list_tasks_passes_statuses_and_deep_scan_to_service(
+    runner, mock_config, mock_client
+):
+    """--field/--list turn on deep_scan the same way --team does, and
+    --status is forwarded for the server-side filter."""
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ), patch("cupt.tasks.TaskService") as svc_cls:
+        svc = svc_cls.return_value
+        svc.list_tasks.return_value = []
+        svc.last_pages_walked = 1
+        runner.invoke(
+            list_tasks_cmd,
+            ["--field", "Repo=astro-site", "--status", "to do"],
+        )
+        _, kwargs = svc.list_tasks.call_args
+        assert kwargs["statuses"] == ["to do"]
+        assert kwargs["deep_scan"] is True
+        assert kwargs["teams_filter"] is False
+
+
 def test_list_tasks_tag_filters_stack(runner, mock_config, mock_client):
     """--tag A --tag B requires both; --no-tag C still excludes."""
     with patch(
@@ -900,6 +1070,89 @@ def test_list_tasks_offline_tag_filter(runner, mock_config, mock_client):
         assert result.exit_code == 0
         assert "Tagged Task" in result.output
         assert "Untagged Task" not in result.output
+
+
+def test_list_tasks_offline_honors_field_sort_list_status(
+    runner, mock_config, mock_client
+):
+    """--field, --sort, --list, and --status are pure client-side operations
+    over the cached tasks, so --offline must honor them too."""
+    mock_config.load_task_cache.return_value = {
+        "tasks": [
+            {
+                "id": "t_small",
+                "name": "Small",
+                "status": {"status": "to do"},
+                "list": {"name": "Website"},
+                "custom_fields": [
+                    {"name": "Repo", "type": "text", "value": "astro-site"},
+                    {"name": "size", "type": "number", "value": 2},
+                ],
+            },
+            {
+                "id": "t_big",
+                "name": "Big",
+                "status": {"status": "to do"},
+                "list": {"name": "Website"},
+                "custom_fields": [
+                    {"name": "Repo", "type": "text", "value": "astro-site"},
+                    {"name": "size", "type": "number", "value": 8},
+                ],
+            },
+            {
+                "id": "t_wrong_status",
+                "name": "Wrong Status",
+                "status": {"status": "done"},
+                "list": {"name": "Website"},
+                "custom_fields": [
+                    {"name": "Repo", "type": "text", "value": "astro-site"},
+                    {"name": "size", "type": "number", "value": 1},
+                ],
+            },
+            {
+                "id": "t_wrong_list",
+                "name": "Wrong List",
+                "status": {"status": "to do"},
+                "list": {"name": "Marketing"},
+                "custom_fields": [
+                    {"name": "Repo", "type": "text", "value": "astro-site"},
+                    {"name": "size", "type": "number", "value": 1},
+                ],
+            },
+            {
+                "id": "t_wrong_repo",
+                "name": "Wrong Repo",
+                "status": {"status": "to do"},
+                "list": {"name": "Website"},
+                "custom_fields": [
+                    {"name": "Repo", "type": "text", "value": "other-repo"},
+                    {"name": "size", "type": "number", "value": 1},
+                ],
+            },
+        ],
+        "timestamp": time.time(),
+    }
+    with patch(
+        "cupt.tasks.get_client_context", return_value=_ctx(mock_config, mock_client)
+    ):
+        result = runner.invoke(
+            list_tasks_cmd,
+            [
+                "--offline",
+                "--list",
+                "Website",
+                "--status",
+                "TO DO",
+                "--field",
+                "Repo=astro-site",
+                "--sort",
+                "size",
+                "--json",
+            ],
+        )
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert [t["id"] for t in data] == ["t_small", "t_big"]
 
 
 def test_show_task_json_output(runner, mock_config, mock_client):

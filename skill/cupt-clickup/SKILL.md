@@ -62,6 +62,18 @@ If `cupt status` exits 2 (it reports "Not authenticated"):
 Once both checks pass, run `cupt teams` to learn the team names available for
 `--team` filters in this workspace.
 
+To confirm *which identity* you are acting as before writing anything — which
+matters when several profiles share one machine — use the machine-readable form:
+
+```bash
+cupt status --json    # {"user":{"id",...}, "workspace":{...}, "config_home":..., "version":...}
+```
+
+Branch on `user.id`, not on the display name: a workspace can hold several
+accounts for the same human or bot. `config_home` tells you which `CUPT_HOME`
+profile was loaded. Check this once at startup; no other command needs to
+re-report identity.
+
 ## List and filter tasks
 
 `cupt list` defaults to `--mine` (tasks assigned to the current user). Use
@@ -79,6 +91,61 @@ cupt list --all --json | jq '.[] | .id'         # pipeable JSON
 
 Stacked `--tag` flags require ALL tags (AND). Stacked `--team` flags match
 ANY team (OR).
+
+### Filtering on custom fields, status, and list
+
+```bash
+cupt list --status "to do"                      # OR across statuses
+cupt list --list "Website"                      # OR across list names
+cupt list --field "Blocked by=Nothing"          # AND across distinct fields
+cupt list --list "Website" --status "to do" \
+          --field "Blocked by=Nothing" --field "Repo=astro-site" \
+          --sort size --json                    # the agent work-selection query
+```
+
+`--sort NAME` orders ascending by a numeric custom field and runs *before*
+`--limit`, so `--sort size -n 5` gives the five smallest. Missing or
+non-numeric values sort last.
+
+`--field` takes `NAME=VALUE`, split on the first `=` only, compared
+case-insensitively against the field's human-readable value (for a dropdown,
+its option name). A `--field` with no `=` exits 4 rather than silently
+matching nothing.
+
+Prefer these over encoding state in tags. `--status` is server-side; `--list`
+and `--field` are client-side, and cupt walks extra result pages when they are
+active so the page cap cannot hide matches.
+
+## Custom fields
+
+```bash
+cupt field list <id> [--json]        # {"id","name","type","value"} per field
+cupt field set <id> "Size" 3
+cupt field set <id> "Blocked by" "Nothing"
+cupt field clear <id> "Release group"
+```
+
+Fields and dropdown options are addressed by **name**; you never handle a
+field uuid. `value` on read is always the human-readable form. An unknown
+field name or dropdown option exits 4 and lists the valid choices — it never
+writes nothing and reports success, so a zero exit here really does mean the
+value was applied.
+
+## Dependencies
+
+```bash
+cupt dep list <id> [--json]
+cupt dep add <id> --waiting-on <other-id>
+cupt dep rm  <id> --waiting-on <other-id>
+```
+
+`dep list --json` returns `waiting_on`, `blocking`, and `blocked`. **Check
+`blocked` before starting work**: when it is true, at least one blocker is not
+yet complete and the task should be skipped.
+
+```bash
+cupt dep list <id> --json | jq -e '.blocked | not' || echo "skip: blocked"
+```
 
 **Important — tasks assigned to a team but not to a person:** If a coworker
 assigns a task to a team rather than to a specific user, `--mine` will NOT
