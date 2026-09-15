@@ -41,5 +41,20 @@ def get_client_context(
         )
         raise click.exceptions.Exit(2)
 
-    client = ClickUpClient(config.get("auth.access_token"))
+    client = ClickUpClient(
+        config.get("auth.access_token"), identity=identity_label(config)
+    )
     return config, client, workspace_id
+
+
+def identity_label(config: ConfigManager) -> Optional[str]:
+    """A human-readable label for the account the token belongs to.
+
+    Used only to say who a 401/403 refused. The id leads because names are not
+    unique — one human or bot can hold several accounts in a workspace.
+    """
+    user_id = config.get("user.user_id")
+    username = config.get("user.username")
+    if user_id and username:
+        return f"user {user_id} ({username})"
+    return str(user_id or username) if (user_id or username) else None

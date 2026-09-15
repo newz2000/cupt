@@ -1,3 +1,4 @@
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -176,3 +177,68 @@ def test_auth_personal_token_success():
         assert result.exit_code == 0
         assert "Authenticated with Personal API Token" in result.output
         instance.set.assert_any_call("auth.access_token", "pk_12345")
+
+
+# ---------------------------------------------------------------------------
+# `cupt status --json` — machine-readable identity
+# ---------------------------------------------------------------------------
+
+
+def _status_json(runner, monkeypatch=None):
+    """Invoke `status --json` against a fully mocked client, return the payload."""
+    with patch("cupt.main.ConfigManager") as mock_config, patch(
+        "cupt.main.ClickUpClient"
+    ) as mock_client:
+        mock_config.return_value.is_authenticated.return_value = True
+        mock_config.return_value.get.side_effect = lambda key, default=None: {
+            "auth.access_token": "token",
+            "user.workspace_id": "ws1",
+            "user.user_id": "14740268",
+            "user.username": "matt",
+        }.get(key, default)
+        mock_client.return_value.get_user.return_value = {
+            "user": {"id": 14740268, "username": "matt", "email": "matt@example.com"}
+        }
+        mock_client.return_value.get_workspaces.return_value = [
+            {"id": "ws1", "name": "My Workspace"}
+        ]
+        result = runner.invoke(cli, ["status", "--json"])
+    return result
+
+
+def test_status_json_carries_user_id_not_just_a_name():
+    """Names are not identifiers — a workspace can hold several accounts for
+    one human or bot, so a script needs the id."""
+    result = _status_json(CliRunner())
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["user"]["id"] == 14740268
+    assert payload["user"]["username"] == "matt"
+    assert payload["user"]["email"] == "matt@example.com"
+    assert payload["workspace"] == {"id": "ws1", "name": "My Workspace"}
+
+
+def test_status_json_reports_the_config_home_actually_loaded(tmp_path, monkeypatch):
+    """A caller must be able to confirm which profile it is acting out of."""
+    monkeypatch.setenv("CUPT_HOME", str(tmp_path / "agent"))
+    result = _status_json(CliRunner())
+    payload = json.loads(result.stdout)
+    assert payload["config_home"] == str(tmp_path / "agent")
+    assert payload["version"] == __version__
+
+
+def test_status_json_prints_only_json_to_stdout():
+    """stdout is data: no success banner may contaminate the JSON."""
+    result = _status_json(CliRunner())
+    json.loads(result.stdout)  # raises if anything else was written
+
+
+def test_status_unauthenticated_exits_non_zero():
+    """Signed out is a failure, not an empty success — a script that reads it
+    as 'no data' would go on to act as nobody at all."""
+    runner = CliRunner()
+    with patch("cupt.main.ConfigManager") as mock_config:
+        mock_config.return_value.is_authenticated.return_value = False
+        result = runner.invoke(cli, ["status", "--json"])
+        assert result.exit_code == EXIT_AUTH
+        assert result.stdout == ""

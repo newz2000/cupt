@@ -1,8 +1,11 @@
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 
 from cupt.api import ClickUpClient
+from cupt.exceptions import APIError
 
 
 @pytest.fixture
@@ -290,3 +293,117 @@ def test_post_request_carries_json_content_type(client, mock_session):
     client.add_task_comment("t1", "hi")
     _, kwargs = mock_session.post.call_args
     assert kwargs["headers"] == {"Content-Type": "application/json"}
+
+
+# ---------------------------------------------------------------------------
+# Error reporting: ClickUp's own code, and who was refused
+# ---------------------------------------------------------------------------
+
+
+def _http_error_client(status_code, payload, identity=None):
+    """A client whose next request fails with `payload` at `status_code`."""
+    client = ClickUpClient("token", identity=identity)
+    response = MagicMock()
+    response.status_code = status_code
+    response.text = json.dumps(payload)
+    response.json.return_value = payload
+    err = requests.exceptions.HTTPError(response=response)
+    response.raise_for_status.side_effect = err
+    client.session.get = MagicMock(return_value=response)
+    return client
+
+
+def test_api_error_carries_clickups_own_error_code():
+    """ClickUp's ECODE (FIELD_220, …) is far more specific than its prose and
+    is what a script branches on, so it must survive verbatim."""
+    client = _http_error_client(
+        400, {"err": "Value must be a number", "ECODE": "FIELD_220"}
+    )
+    with pytest.raises(APIError) as exc:
+        client.get_task("abc")
+    assert "FIELD_220" in str(exc.value)
+    assert "Value must be a number" in str(exc.value)
+
+
+def test_api_error_without_ecode_is_unchanged():
+    client = _http_error_client(400, {"err": "Bad request"})
+    with pytest.raises(APIError) as exc:
+        client.get_task("abc")
+    assert "HTTP 400: Bad request" in str(exc.value)
+    assert "[" not in str(exc.value)
+
+
+@pytest.mark.parametrize("status_code", [401, 403])
+def test_permission_failure_names_the_identity_that_was_refused(status_code):
+    """Permission failures are identity-specific and the caller may be running
+    as a service account, so the message must say who was refused."""
+    client = _http_error_client(
+        status_code,
+        {"err": "Team not authorized", "ECODE": "OAUTH_027"},
+        identity="user 14740268 (matt)",
+    )
+    with pytest.raises(APIError) as exc:
+        client.get_task("abc")
+    assert "refused for user 14740268 (matt)" in str(exc.value)
+
+
+def test_non_permission_failure_does_not_name_an_identity():
+    """A 404 is not about who you are; naming an identity there misleads."""
+    client = _http_error_client(
+        404, {"err": "Task not found"}, identity="user 14740268 (matt)"
+    )
+    with pytest.raises(APIError) as exc:
+        client.get_task("abc")
+    assert "refused for" not in str(exc.value)
+
+
+def test_permission_failure_without_a_known_identity_says_nothing_extra():
+    client = _http_error_client(403, {"err": "Team not authorized"})
+    with pytest.raises(APIError) as exc:
+        client.get_task("abc")
+    assert "refused for" not in str(exc.value)
+
+
+# ---------------------------------------------------------------------------
+# DELETE carries query parameters
+# ---------------------------------------------------------------------------
+
+
+def test_delete_passes_query_params():
+    """ClickUp takes the dependency pair as query params on a DELETE; dropping
+    them silently removed nothing."""
+    client = ClickUpClient("token")
+    response = MagicMock()
+    response.json.return_value = {}
+    client.session.delete = MagicMock(return_value=response)
+
+    client.remove_task_dependency("task1", "task2")
+
+    _args, kwargs = client.session.delete.call_args
+    assert kwargs["params"] == {"depends_on": "task2"}
+
+
+def test_remove_task_custom_field_sends_no_params():
+    client = ClickUpClient("token")
+    response = MagicMock()
+    response.json.return_value = {}
+    client.session.delete = MagicMock(return_value=response)
+
+    client.remove_task_custom_field("task1", "field1")
+
+    url = client.session.delete.call_args[0][0]
+    assert url.endswith("/task/task1/field/field1")
+    assert client.session.delete.call_args[1]["params"] is None
+
+
+def test_set_task_custom_field_posts_the_value_under_a_value_key():
+    client = ClickUpClient("token")
+    response = MagicMock()
+    response.json.return_value = {}
+    client.session.post = MagicMock(return_value=response)
+
+    client.set_task_custom_field("task1", "field1", 3)
+
+    url = client.session.post.call_args[0][0]
+    assert url.endswith("/task/task1/field/field1")
+    assert client.session.post.call_args[1]["json"] == {"value": 3}

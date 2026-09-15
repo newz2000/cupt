@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from cupt.api import ClickUpClient
+from cupt.services.field_service import display_value
 
 logger = logging.getLogger(__name__)
 
@@ -66,18 +67,40 @@ class TaskService:
         max_pages: int = 15,
         tags: Optional[List[str]] = None,
         teams_filter: bool = False,
+        statuses: Optional[List[str]] = None,
+        deep_scan: bool = False,
+        custom_item_ids: Optional[List[int]] = None,
     ) -> List[Dict[str, Any]]:
         """Fetch and filter tasks from the API with pagination.
 
         Args:
-            teams_filter: When True, the caller intends to apply a
-                client-side team (user-group) filter to the result. ClickUp
-                has no server-side filter for `group_assignees`, so the
-                100-task early-exit would silently truncate matches that
-                live further down the result. Setting this flag suppresses
-                the early-exit and (for `mine=False`) doubles the page cap
-                from 5 to 10. Read `last_pages_walked` after the call to
-                report search cost to the user.
+            statuses: Status names to push to ClickUp's server-side
+                `statuses[]` filter (OR semantics). Unlike tags or teams,
+                ClickUp's team task endpoint supports this natively, so it
+                is never applied client-side.
+            custom_item_ids: Task type ids (a task's `custom_item_id`) to
+                push to ClickUp's server-side `custom_items[]` filter (OR
+                semantics). Like `statuses`, this is supported natively by
+                the team task endpoint, so it does not need `deep_scan` —
+                there is no pagination-starvation hazard the way there is
+                for tags/teams/fields. `0` (the default task type) is a
+                legitimate value, so this is checked with `is not None`,
+                not truthiness.
+            teams_filter: The original special case of `deep_scan`, kept
+                for backward compatibility with existing callers: when
+                True, the caller intends to apply a client-side team
+                (user-group) filter to the result. ClickUp has no
+                server-side filter for `group_assignees`, so the 100-task
+                early-exit would silently truncate matches that live
+                further down the result. Setting this flag suppresses the
+                early-exit and (for `mine=False`) doubles the page cap from
+                5 to 10. Read `last_pages_walked` after the call to report
+                search cost to the user.
+            deep_scan: The general form of `teams_filter` — set this True
+                for any client-side filter (custom fields, list names,
+                etc.) that could otherwise be silently starved by the
+                pagination cap. Has the identical effect as `teams_filter`;
+                either flag (or both) enables deep scanning.
         """
         filters = self.get_filters(overdue, today, week)
 
@@ -90,16 +113,34 @@ class TaskService:
         if tags:
             filters["tags[]"] = list(tags)
 
+        # statuses[] IS supported server-side by ClickUp's team task
+        # endpoint (OR semantics), unlike tags/teams, so no client-side
+        # narrowing is needed here.
+        if statuses:
+            filters["statuses[]"] = list(statuses)
+
+        # custom_items[] IS supported server-side by ClickUp's team task
+        # endpoint (OR semantics, confirmed against the live API for id 0
+        # too), so — like statuses — no client-side narrowing or deep_scan
+        # is needed here. `0` is a real type id, hence `is not None`.
+        if custom_item_ids is not None:
+            filters["custom_items[]"] = list(custom_item_ids)
+
+        # `deep` collapses the original teams-only flag and the general
+        # `deep_scan` flag into one condition driving the pagination logic
+        # below, so both special case and general callers behave the same.
+        deep = teams_filter or deep_scan
+
         all_tasks: List[Dict[str, Any]] = []
         page = 0
         pages_walked = 0
         # `mine` queries can walk deeper because the assignee filter already
         # narrows the server-side set. Workspace-wide (`--all`) is more
-        # expensive per page, hence the lower default cap. Team filtering
+        # expensive per page, hence the lower default cap. Deep scanning
         # gets a modest --all bump because the worst undercount we saw in
         # benchmarks was on --all queries.
         if not mine:
-            limit_pages = 10 if teams_filter else 5
+            limit_pages = 10 if deep else 5
         else:
             limit_pages = max_pages
 
@@ -122,12 +163,12 @@ class TaskService:
             )
             all_tasks.extend(filtered)
 
-            # Without a team filter, stop once we have 100 results — the
+            # Without a deep scan, stop once we have 100 results — the
             # caller's other filters are server-side and any further pages
-            # are wasted API calls. With a team filter, keep walking: the
-            # team match runs after this function returns and may live on
-            # later pages.
-            if not teams_filter and len(all_tasks) >= 100:
+            # are wasted API calls. With a deep scan, keep walking: the
+            # client-side match runs after this function returns and may
+            # live on later pages.
+            if not deep and len(all_tasks) >= 100:
                 break
             if len(tasks) < 100:
                 break
@@ -210,6 +251,107 @@ class TaskService:
             return bool(req & present)
 
         return [t for t in tasks if keep(t)]
+
+    @staticmethod
+    def field_value(task: Dict[str, Any], name: str) -> Any:
+        """
+        Return the human-readable value of a custom field, or None if unset.
+
+        Looks up `task["custom_fields"]` for an entry whose name matches
+        `name` case-insensitively (surrounding whitespace stripped), then
+        hands it to :func:`cupt.services.field_service.display_value`, which
+        is the single implementation of "what does this field say" for both
+        `cupt field list` and the `--field` / `--sort` filters. Keeping one
+        copy is what stops display and filtering from disagreeing: an option
+        id never reaches the caller either way, and a value matching no
+        current option reads as None in both.
+
+        Pure function; no I/O.
+        """
+        target = name.strip().lower()
+        field = next(
+            (
+                f
+                for f in task.get("custom_fields") or []
+                if (f.get("name") or "").strip().lower() == target
+            ),
+            None,
+        )
+        if field is None:
+            return None
+        return display_value(field)
+
+    @staticmethod
+    def filter_by_fields(
+        tasks: List[Dict[str, Any]],
+        required: Optional[Dict[str, str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Filter tasks by custom field value (case-insensitive, AND semantics).
+
+        Each `required` entry is `field name -> expected value`; the
+        expected value is compared case-insensitively as a string against
+        `field_value`. A list-valued field (e.g. multi-select) matches if
+        any element equals the expected value. A task missing the field
+        (`field_value` returns None) is dropped. Pure function; no I/O.
+        """
+        if not required:
+            return tasks
+
+        def keep(task: Dict[str, Any]) -> bool:
+            for name, expected in required.items():
+                actual = TaskService.field_value(task, name)
+                if actual is None:
+                    return False
+                exp = str(expected).strip().lower()
+                if isinstance(actual, list):
+                    if not any(str(v).strip().lower() == exp for v in actual):
+                        return False
+                elif str(actual).strip().lower() != exp:
+                    return False
+            return True
+
+        return [t for t in tasks if keep(t)]
+
+    @staticmethod
+    def filter_by_list_names(
+        tasks: List[Dict[str, Any]],
+        required: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Filter tasks by list name (case-insensitive, OR semantics).
+
+        Matches `task["list"]["name"]` against any entry in `required`.
+        Pure function; no I/O.
+        """
+        if not required:
+            return tasks
+        req = {r.lower() for r in required}
+
+        def keep(task: Dict[str, Any]) -> bool:
+            list_name = (task.get("list") or {}).get("name")
+            return bool(list_name) and list_name.lower() in req
+
+        return [t for t in tasks if keep(t)]
+
+    @staticmethod
+    def sort_by_field(tasks: List[Dict[str, Any]], name: str) -> List[Dict[str, Any]]:
+        """
+        Stable ascending sort by the numeric value of custom field `name`.
+
+        Tasks whose value is missing or non-numeric sort last, keeping
+        their relative order (Python's `sorted` is stable). Returns a new
+        list; does not mutate `tasks`. Pure function; no I/O.
+        """
+
+        def sort_key(task: Dict[str, Any]):
+            value = TaskService.field_value(task, name)
+            try:
+                return (0, float(value))
+            except (TypeError, ValueError):
+                return (1, 0.0)
+
+        return sorted(tasks, key=sort_key)
 
     def resolve_parent_names(
         self,

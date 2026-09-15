@@ -6,10 +6,11 @@ from typing import Optional
 import click
 
 from cupt.context import get_client_context
-from cupt.errors import EXIT_AUTH, EXIT_NOT_FOUND, fail
+from cupt.errors import EXIT_AUTH, EXIT_INVALID_INPUT, EXIT_NOT_FOUND, fail
 from cupt.i18n import _, format_message
 from cupt.resolver import IDResolutionError, resolve_task_id
 from cupt.services.task_service import TaskService
+from cupt.services.type_service import TypeService
 from cupt.state import StateManager
 from cupt.utils import (
     format_comment_author,
@@ -221,6 +222,46 @@ def _print_active_footer(state: StateManager) -> None:
     ),
 )
 @click.option(
+    "--field",
+    "fields",
+    multiple=True,
+    metavar="NAME=VALUE",
+    help=(
+        "Only tasks where custom field NAME equals VALUE (repeatable; "
+        "AND semantics across distinct NAMEs)."
+    ),
+)
+@click.option(
+    "--sort",
+    "sort_field",
+    help="Sort results ascending by numeric custom field NAME (applied before --limit)",
+)
+@click.option(
+    "--status",
+    "statuses",
+    multiple=True,
+    help="Only tasks with this status name (repeatable; OR semantics)",
+)
+@click.option(
+    "--list",
+    "list_names",
+    multiple=True,
+    # Deliberately a name match on the task payload's own `list.name`, not a
+    # hierarchy walk: resolving a list name to an id would mean crawling
+    # spaces and folders on every query, and the task already carries its
+    # list's name — no extra round trip needed.
+    help="Only tasks in this list by name (repeatable; OR semantics)",
+)
+@click.option(
+    "--type",
+    "type_names",
+    multiple=True,
+    help=(
+        "Only tasks of this task type by name (repeatable; OR semantics). "
+        "Run 'cupt types' to list available types. Server-side filter."
+    ),
+)
+@click.option(
     "--json",
     "as_json",
     is_flag=True,
@@ -241,6 +282,11 @@ def list_tasks_cmd(
     tags=(),
     no_tags=(),
     teams=(),
+    fields=(),
+    sort_field=None,
+    statuses=(),
+    list_names=(),
+    type_names=(),
     as_json=False,
 ):
     """List tasks with optional filters"""
@@ -260,6 +306,11 @@ def list_tasks_cmd(
         tags,
         no_tags,
         teams,
+        fields,
+        sort_field,
+        statuses,
+        list_names,
+        type_names,
         as_json,
     )
 
@@ -269,6 +320,39 @@ def _filter_by_tags(tasks, tags, no_tags):
     return TaskService.filter_by_tags(
         tasks, required=list(tags) or None, excluded=list(no_tags) or None
     )
+
+
+def _parse_field_filters(fields):
+    """Parse repeated `--field NAME=VALUE` options into a dict, or None.
+
+    Splits on the first `=` only, so VALUE may itself contain `=`. A
+    `--field` with no `=` is a usage error, not a filter that silently
+    matches nothing, so it exits immediately with EXIT_INVALID_INPUT.
+    """
+    if not fields:
+        return None
+    parsed = {}
+    for raw in fields:
+        if "=" not in raw:
+            fail(
+                format_message(
+                    "Invalid --field {value!r}; expected NAME=VALUE.", value=raw
+                ),
+                code=EXIT_INVALID_INPUT,
+            )
+        name, _sep, value = raw.partition("=")
+        parsed[name] = value
+    return parsed
+
+
+def _resolve_type_names(client, workspace_id, type_names):
+    """Resolve `--type` names into `custom_item_id` ids via TypeService.
+
+    Raises ``ValueError`` (unknown name, listing the valid ones) or
+    propagates whatever the underlying API call raises (most commonly a
+    network failure) — callers decide how to report each case.
+    """
+    return TypeService(client).resolve_names(workspace_id, list(type_names))
 
 
 def list_tasks(
@@ -285,9 +369,18 @@ def list_tasks(
     tags=(),
     no_tags=(),
     teams=(),
+    fields=(),
+    sort_field=None,
+    statuses=(),
+    list_names=(),
+    type_names=(),
     as_json=False,
 ):
     """List and display tasks."""
+    # Usage-error validation happens before any I/O so a malformed --field
+    # fails fast in both online and offline mode.
+    field_filters = _parse_field_filters(fields)
+
     config, client, config_workspace_id = get_client_context(need_workspace=False)
     if not client:
         return []
@@ -304,11 +397,42 @@ def list_tasks(
     try:
         if offline:
             return _list_tasks_offline(
-                config, limit, verbose, hide_subtasks, tags, no_tags, teams, as_json
+                config,
+                limit,
+                verbose,
+                hide_subtasks,
+                tags,
+                no_tags,
+                teams,
+                field_filters,
+                sort_field,
+                statuses,
+                list_names,
+                type_names,
+                client,
+                active_workspace_id,
+                as_json,
             )
+
+        custom_item_ids = None
+        if type_names:
+            try:
+                custom_item_ids = _resolve_type_names(
+                    client, active_workspace_id, type_names
+                )
+            except ValueError as e:
+                fail(str(e), code=EXIT_INVALID_INPUT)
 
         service = TaskService(client)
         team_filter_active = bool(teams)
+        # Any client-side filter (fields, list names, or teams) can't see
+        # past the 100-task pagination cap unless we tell list_tasks to
+        # keep walking — same reasoning as the original team-only case.
+        # --type is deliberately excluded: custom_items[] is a server-side
+        # filter (verified against the live API, id 0 included), so it
+        # doesn't starve under the pagination cap the way fields/list/teams
+        # do.
+        deep_scan_active = bool(field_filters) or bool(list_names) or bool(teams)
         list_start = time.perf_counter()
         tasks = service.list_tasks(
             workspace_id=active_workspace_id,
@@ -320,6 +444,9 @@ def list_tasks(
             mine=mine,
             tags=list(tags) if tags else None,
             teams_filter=team_filter_active,
+            statuses=list(statuses) if statuses else None,
+            deep_scan=deep_scan_active,
+            custom_item_ids=custom_item_ids,
         )
         list_elapsed = time.perf_counter() - list_start
 
@@ -338,12 +465,21 @@ def list_tasks(
         if teams:
             tasks = TaskService.filter_by_teams(tasks, required=list(teams))
 
+        if list_names:
+            tasks = TaskService.filter_by_list_names(tasks, required=list(list_names))
+
+        if field_filters:
+            tasks = TaskService.filter_by_fields(tasks, required=field_filters)
+
         if not tasks:
             if as_json:
                 click.echo("[]")
             else:
                 print_warning(_("No tasks matched the filter."))
             return []
+
+        if sort_field:
+            tasks = TaskService.sort_by_field(tasks, sort_field)
 
         if limit:
             tasks = tasks[:limit]
@@ -465,9 +601,22 @@ def _list_tasks_offline(
     tags=(),
     no_tags=(),
     teams=(),
+    field_filters=None,
+    sort_field=None,
+    statuses=(),
+    list_names=(),
+    type_names=(),
+    client=None,
+    workspace_id=None,
     as_json=False,
 ):
-    """Display tasks from local cache without any API calls."""
+    """Display tasks from local cache.
+
+    Makes no API call except for `--type`: the workspace's type definitions
+    aren't part of the cache, so resolving a type name to its id needs the
+    network. Every other filter here is pure client-side work over the
+    cached tasks.
+    """
     cached = config.load_task_cache()
     if not cached:
         if as_json:
@@ -508,15 +657,56 @@ def _list_tasks_offline(
     if hide_subtasks:
         tasks = [t for t in tasks if not t.get("parent")]
 
+    # --status has no server to push a filter to in offline mode, so it's
+    # matched client-side here against the cached status name.
+    if statuses:
+        wanted = {s.lower() for s in statuses}
+        tasks = [
+            t
+            for t in tasks
+            if (t.get("status") or {}).get("status", "").lower() in wanted
+        ]
+
     tasks = _filter_by_tags(tasks, tags, no_tags)
     if teams:
         tasks = TaskService.filter_by_teams(tasks, required=list(teams))
+    if list_names:
+        tasks = TaskService.filter_by_list_names(tasks, required=list(list_names))
+    if type_names:
+        # Resolving a type name to its id still costs an API call — the
+        # workspace's type definitions aren't part of the offline cache —
+        # so --offline --type degrades cleanly instead of silently
+        # matching nothing when there's no network to resolve it.
+        try:
+            custom_item_ids = _resolve_type_names(client, workspace_id, type_names)
+        except ValueError as e:
+            fail(str(e), code=EXIT_INVALID_INPUT)
+        except Exception:
+            fail(
+                _(
+                    "--type needs a network connection to resolve type "
+                    "names (the type list isn't part of the offline cache)."
+                ),
+                code=EXIT_INVALID_INPUT,
+            )
+        wanted = set(custom_item_ids)
+        tasks = [
+            t
+            for t in tasks
+            if (t.get("custom_item_id") if t.get("custom_item_id") is not None else 0)
+            in wanted
+        ]
+    if field_filters:
+        tasks = TaskService.filter_by_fields(tasks, required=field_filters)
     if not tasks:
         if as_json:
             click.echo("[]")
         else:
             print_warning(_("No tasks matched the filter."))
         return []
+
+    if sort_field:
+        tasks = TaskService.sort_by_field(tasks, sort_field)
 
     if limit:
         tasks = tasks[:limit]
@@ -576,7 +766,7 @@ def show_task(
     as_json: bool = False,
 ):
     """Display full details for a single task."""
-    config, client, _workspace_id = get_client_context(need_workspace=False)
+    config, client, workspace_id = get_client_context(need_workspace=False)
     if not client:
         return
 
@@ -596,6 +786,7 @@ def show_task(
                 )
 
         p_id = task.get("parent")
+        type_id = task.get("custom_item_id")
 
         def _fetch_parent():
             if not p_id:
@@ -605,8 +796,22 @@ def show_task(
             except Exception:
                 return None
 
-        with ThreadPoolExecutor(max_workers=2) as executor:
+        def _fetch_type_name():
+            # Only the default (id 0 / missing) type is free — resolving
+            # any other type name costs an API call, so ordinary tasks
+            # (the vast majority) never pay for it.
+            if type_id is None or type_id == 0 or not workspace_id:
+                return None
+            try:
+                return TypeService(client).name_for(workspace_id, type_id)
+            except Exception:
+                # Degrade gracefully: show the task without its type name
+                # rather than failing the whole command over a lookup.
+                return None
+
+        with ThreadPoolExecutor(max_workers=3) as executor:
             fut_parent = executor.submit(_fetch_parent)
+            fut_type = executor.submit(_fetch_type_name)
             fut_notes = (
                 executor.submit(client.get_task_comments, task_id)
                 if include_notes or as_json
@@ -614,6 +819,7 @@ def show_task(
             )
 
         parent_task = fut_parent.result()
+        type_name = fut_type.result()
         comments = fut_notes.result() if fut_notes is not None else []
 
         # Always save to detail cache so --offline works next time.
@@ -630,23 +836,35 @@ def show_task(
         if as_json:
             click.echo(
                 json.dumps(
-                    {"task": task, "parent": parent_task, "comments": comments},
+                    {
+                        "task": task,
+                        "parent": parent_task,
+                        "comments": comments,
+                        "type_name": type_name,
+                    },
                     indent=2,
                 )
             )
             return
 
-        _display_task(task, parent_task, comments, include_notes)
+        _display_task(task, parent_task, comments, include_notes, type_name)
 
     except Exception as e:
         fail(format_message("Failed to show task: {error}", error=e), e)
 
 
-def _display_task(task, parent_task, comments, include_notes: bool):
+def _display_task(
+    task, parent_task, comments, include_notes: bool, type_name: Optional[str] = None
+):
     """Render task details to stdout."""
     click.echo(f"\n{_('Task')}: {task.get('name')}")
     click.echo("=" * 40)
     click.echo(f"{_('ID')}:       {task.get('id')}")
+    # Suppressed for ordinary tasks (id 0 / missing) — a "Type: Task" line
+    # on every task would be noise; it's only worth printing when it's
+    # telling you something.
+    if type_name:
+        click.echo(f"{_('Type')}:     {type_name}")
     click.echo(
         f"{_('Status')}:   {task.get('status', {}).get('status', 'unknown').upper()}"
     )
